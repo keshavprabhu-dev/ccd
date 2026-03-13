@@ -1,0 +1,36 @@
+/* You can add global styles to this file, and also import other style files */
+:root {
+  --navy-blue: #000080;
+  --navy-blue-light: #1a1a99;
+  --navy-blue-dark: #00004d;
+  --navy-blue-gradient: linear-gradient(135deg, #000080 0%, #00004d 100%);
+  --white: #ffffff;
+  --background: #f4f6f9;
+  --text-primary: #000080;
+  --text-secondary: #4a5568;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  font-family: 'Roboto', sans-serif;
+  background-color: var(--background);
+  color: var(--text-secondary);
+  height: 100%;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--navy-blue);
+  margin-top: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.page-container {
+  background: var(--white);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 2.5rem;
+}

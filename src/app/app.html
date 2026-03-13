@@ -1,0 +1,87 @@
+<div class="app-container" [class.logged-in]="currentUser() !== null">
+  @if (!currentUser()) {
+    <div class="login-container">
+      <header class="app-header-login">
+        <div class="logo">CCD</div>
+      </header>
+
+      <main class="login-main">
+        <div class="login-card">
+          <div class="login-header">
+            <h2>Welcome Back</h2>
+            <p>Please log in to your account</p>
+          </div>
+
+          <form class="login-form" [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+            
+            @if (loginError()) {
+              <div class="error-message">
+                {{ loginError() }}
+              </div>
+            }
+
+            <div class="form-group">
+              <label for="username">Username</label>
+              <input type="text" id="username" formControlName="username" placeholder="Enter your username" required autofocus>
+            </div>
+
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input type="password" id="password" formControlName="password" autocomplete="current-password" placeholder="Enter your password" required>
+            </div>
+
+            <div class="form-actions">
+              <label class="remember-me">
+                <input type="checkbox" name="remember"> Remember me
+              </label>
+              <a href="#" class="forgot-password">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="btn-primary" [disabled]="loginForm.invalid">Sign In</button>
+          </form>
+
+          <div class="login-footer">
+            <p>Don't have an account? <a href="#">Create one</a></p>
+          </div>
+        </div>
+      </main>
+
+      <footer class="app-footer">
+        <p>&copy; 2026 CCD Application. All rights reserved.</p>
+      </footer>
+    </div>
+  } @else {
+    <div class="dashboard-layout">
+      <header class="app-header-dashboard">
+        <div class="header-left">
+          <button type="button" class="btn-hamburger" aria-label="Toggle sidebar menu" (click)="toggleSidebar()">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+          </button>
+          <div class="logo">CCD</div>
+        </div>
+        <div class="user-info">
+          <span>Logged in as <strong>{{ currentUser().username }}</strong> ({{ currentUser().role }})</span>
+          <button type="button" class="btn-logout" (click)="logout()">Logout</button>
+        </div>
+      </header>
+
+      <div class="main-body">
+        <aside class="sidebar" [class.open]="isSidebarOpen()">
+          <nav class="sidebar-nav">
+            <a routerLink="/dashboard" routerLinkActive="active" (click)="closeSidebar()">Dashboard</a>
+            <a routerLink="/issuance-management" routerLinkActive="active" (click)="closeSidebar()">Issuance Management</a>
+            <a routerLink="/check-processing" routerLinkActive="active" (click)="closeSidebar()">Check Processing</a>
+            <a routerLink="/stop-payments" routerLinkActive="active" (click)="closeSidebar()">Stop Payments</a>
+            <a routerLink="/administration" routerLinkActive="active" (click)="closeSidebar()">Administration</a>
+          </nav>
+        </aside>
+
+        <main class="content-area">
+          <router-outlet></router-outlet>
+        </main>
+      </div>
+    </div>
+  }
+</div>
