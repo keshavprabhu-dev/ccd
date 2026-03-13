@@ -1,4 +1,215 @@
 <div class="page-container">
-  <h2>Issuance Management</h2>
-  <p>This page will hold the Issuance Management features.</p>
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
+    <div>
+      <h2>Issuance Management</h2>
+      <p>This page will hold the Issuance Management features.</p>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.75rem; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+      <label for="currentUserSelect" style="font-weight: 600; color: var(--navy-blue); font-size: 0.9rem; margin-bottom: 0;">Logged in as:</label>
+      <select id="currentUserSelect" [(ngModel)]="currentUser" class="form-control" style="width: auto; padding: 0.4rem 0.75rem; min-width: 175px;">
+        <option *ngFor="let user of users" [value]="user">{{ user }}</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="split-layout">
+  <!-- Left Side: Table Area -->
+  <div class="left-panel">
+    <div class="file-upload-card">
+      <h3>File Upload</h3>
+      <div class="file-upload-area">
+        <input type="file" id="fileUpload" class="file-input" (change)="onFileSelected($event)">
+        <label for="fileUpload" class="file-label">
+          <span class="upload-icon">📁</span>
+          <span *ngIf="!selectedFileName">Choose a file or drag it here</span>
+          <span *ngIf="selectedFileName" class="selected-file">{{ selectedFileName }}</span>
+        </label>
+        <button type="button" class="btn-primary flex-center" [disabled]="!selectedFile || isUploading" (click)="uploadFile()">
+          <span *ngIf="!isUploading">Upload</span>
+          <span *ngIf="isUploading" class="loader-spinner"></span>
+          <span *ngIf="isUploading" style="margin-left: 0.5rem;">Importing...</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="form-header-actions">
+        <h3>Issuance Records</h3>
+        <div class="header-buttons">
+          <button type="button" class="btn-icon" (click)="exportRecords()" title="Export" aria-label="Export Records" [disabled]="allRecords.length === 0">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          </button>
+          <button type="button" class="btn-icon" (click)="toggleColumnConfig()" title="Columns" aria-label="Toggle Columns">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path></svg>
+          </button>
+          <button type="button" class="btn-icon" (click)="toggleFilters()" title="Filters" aria-label="Toggle Filters" [class.active-icon]="showFilters" [disabled]="allRecords.length === 0">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="column-config-panel" *ngIf="showColumnConfig">
+        <label><input type="checkbox" [(ngModel)]="columns.createdBy"> Created By</label>
+        <label><input type="checkbox" [(ngModel)]="columns.createdTimestamp"> Created Date</label>
+        <label><input type="checkbox" [(ngModel)]="columns.modifiedBy"> Modified By</label>
+        <label><input type="checkbox" [(ngModel)]="columns.modifiedTimestamp"> Modified Date</label>
+        <label><input type="checkbox" [(ngModel)]="columns.approvedBy"> Approved By</label>
+        <label><input type="checkbox" [(ngModel)]="columns.approvedTimestamp"> Approved Date</label>
+        <label><input type="checkbox" [(ngModel)]="columns.modifiedCount"> Mod. Count</label>
+      </div>
+      
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="checkbox-cell">
+                <input type="checkbox" (change)="toggleAllSelection($event)">
+              </th>
+              <th *ngIf="columns.date">
+                <div class="th-content">Issued Date</div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.date" (ngModelChange)="applyFilters()" class="filter-input" placeholder="YYYY-MM-DD">
+              </th>
+              <th *ngIf="columns.serialNumber">
+                <div class="th-content">Serial Number</div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.serialNumber" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Serial">
+              </th>
+              <th *ngIf="columns.accountNumber">
+                <div class="th-content">Account Number</div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.accountNumber" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Account">
+              </th>
+              <th *ngIf="columns.beneficiary">
+                <div class="th-content">Beneficiary</div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.beneficiary" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Beneficiary">
+              </th>
+              <th *ngIf="columns.amount">
+                <div class="th-content">Amount</div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.amount" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Amount">
+              </th>
+              <th *ngIf="columns.createdBy"><div class="th-content">Created By</div></th>
+              <th *ngIf="columns.createdTimestamp"><div class="th-content">Created Date</div></th>
+              <th *ngIf="columns.modifiedBy"><div class="th-content">Modified By</div></th>
+              <th *ngIf="columns.modifiedTimestamp"><div class="th-content">Modified Date</div></th>
+              <th *ngIf="columns.approvedBy"><div class="th-content">Approved By</div></th>
+              <th *ngIf="columns.approvedTimestamp"><div class="th-content">Approved Date</div></th>
+              <th *ngIf="columns.modifiedCount"><div class="th-content">Mod. Count</div></th>
+              <th><div class="th-content">Status</div></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let record of paginatedRecords"
+                (click)="selectRecord(record)"
+                [class.selected-row]="record === selectedRecord"
+                class="clickable-row">
+              <td class="checkbox-cell">
+                <input type="checkbox" [(ngModel)]="record.selected" (click)="$event.stopPropagation()">
+              </td>
+              <td *ngIf="columns.date">{{ record.date }}</td>
+              <td *ngIf="columns.serialNumber">{{ record.serialNumber }}</td>
+              <td *ngIf="columns.accountNumber">{{ record.accountNumber }}</td>
+              <td *ngIf="columns.beneficiary">{{ record.beneficiary }}</td>
+              <td *ngIf="columns.amount">{{ record.amount | number:'1.2-2' }}</td>
+              <td *ngIf="columns.createdBy">{{ record.createdBy }}</td>
+              <td *ngIf="columns.createdTimestamp">{{ record.createdTimestamp | date:'short' }}</td>
+              <td *ngIf="columns.modifiedBy">{{ record.modifiedBy }}</td>
+              <td *ngIf="columns.modifiedTimestamp">{{ record.modifiedTimestamp | date:'short' }}</td>
+              <td *ngIf="columns.approvedBy">{{ record.approvedBy }}</td>
+              <td *ngIf="columns.approvedTimestamp">{{ record.approvedTimestamp | date:'short' }}</td>
+              <td *ngIf="columns.modifiedCount">{{ record.modifiedCount }}</td>
+              <td>
+                <span class="status-badge" [ngClass]="'status-' + record.recordStatus?.toLowerCase()">
+                  <svg *ngIf="record.recordStatus === 'APPROVED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 2px; display: inline-block; margin-top: -2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                  <svg *ngIf="record.recordStatus === 'PENDING' || record.recordStatus === 'NEW' || record.recordStatus === 'IMPORTED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 2px; display: inline-block; margin-top: -2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                  {{ record.recordStatus }}
+                </span>
+              </td>
+            </tr>
+            <tr *ngIf="paginatedRecords.length === 0">
+              <td colspan="14" class="empty-state">No records found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-footer-actions" style="margin-top: 1.5rem; display: flex; gap: 0.75rem; justify-content: flex-end; flex-wrap: wrap;">
+        <button type="button" class="btn-primary-small" (click)="openBulkModal('SUBMIT')" [disabled]="!hasSelectedRecords" style="padding: 0.5rem 1rem;">Submit Selected</button>
+        <button type="button" class="btn-success-small" (click)="openBulkModal('APPROVE')" [disabled]="!hasSelectedRecords">Approve Selected</button>
+        <button type="button" class="btn-danger" (click)="openBulkModal('VOID')" [disabled]="!hasSelectedRecords" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Void Selected</button>
+        <button type="button" class="btn-danger" (click)="openBulkModal('DELETE')" [disabled]="!hasSelectedRecords" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Delete Selected</button>
+      </div>
+      
+      <div class="pagination-controls">
+        <button class="btn-outline" (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
+        <div class="page-info">Page {{ currentPage }} of {{ totalPages }}</div>
+        <button class="btn-outline" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Form Area -->
+  <div class="right-panel">
+    <div class="form-card">
+      <div class="form-header-actions">
+        <h3>Issuance Form</h3>
+        <button type="button" class="btn-outline-small" (click)="startNewRecord()">New</button>
+      </div>
+      <form (ngSubmit)="submitForm()" class="issuance-form">
+        <div class="form-group">
+          <label for="issuedDate">Issued Date (YYYY-MM-DD)</label>
+          <input type="date" id="issuedDate" name="issuedDate" [(ngModel)]="newRecord.date" class="form-control" required [disabled]="!isFormEditable">
+        </div>
+
+        <div class="form-group">
+          <label for="serialNumber">Serial Number</label>
+          <input type="text" id="serialNumber" name="serialNumber" [(ngModel)]="newRecord.serialNumber" class="form-control" required [disabled]="!isFormEditable">
+        </div>
+
+        <div class="form-group">
+          <label for="accountNumber">Account Number</label>
+          <input type="text" id="accountNumber" name="accountNumber" [(ngModel)]="newRecord.accountNumber" class="form-control" required [disabled]="!isFormEditable">
+        </div>
+
+        <div class="form-group">
+          <label for="beneficiaryTitle">Beneficiary</label>
+          <input type="text" id="beneficiaryTitle" name="beneficiaryTitle" [(ngModel)]="newRecord.beneficiary" class="form-control" required [disabled]="!isFormEditable">
+        </div>
+
+        <div class="form-group">
+          <label for="amountValue">Amount</label>
+          <input type="number" id="amountValue" name="amountValue" [(ngModel)]="newRecord.amount" class="form-control" step="0.01" required [disabled]="!isFormEditable">
+        </div>
+
+        <div class="form-actions form-action-buttons">
+          <ng-container *ngIf="!isFormEditable">
+            <button type="button" class="btn-secondary" (click)="startNewRecord()">New</button>
+            <ng-container *ngIf="selectedRecord">
+              <button type="button" class="btn-secondary" *ngIf="selectedRecord.recordStatus !== 'VOID' && selectedRecord.recordStatus !== 'DELETED'" (click)="unlockForm()">Unlock</button>
+              
+              <button type="button" class="btn-danger" *ngIf="selectedRecord.recordStatus !== 'VOID' && selectedRecord.recordStatus !== 'DELETED'" (click)="voidRecordFromLocked()">Void</button>
+              <button type="button" class="btn-outline" *ngIf="selectedRecord.recordStatus === 'VOID'" (click)="revertVoidFromLocked()">Revert Void</button>
+              
+              <button type="button" class="btn-danger" *ngIf="selectedRecord.recordStatus !== 'VOID' && selectedRecord.recordStatus !== 'DELETED'" (click)="deleteRecord()">Delete</button>
+              
+              <button type="button" class="btn-primary" *ngIf="selectedRecord.recordStatus === 'NEW' || selectedRecord.recordStatus === 'IMPORTED'" (click)="submitRecordForApprovalFromLocked()">Submit</button>
+              
+              <button type="button" class="btn-success" *ngIf="selectedRecord.recordStatus === 'PENDING'" [title]="!canApprove(selectedRecord) ? 'Maker cannot be checker' : ''" [disabled]="!canApprove(selectedRecord)" (click)="approveRecordFromLocked()">
+                Approve <span *ngIf="!canApprove(selectedRecord)" style="font-size: 0.85em; margin-left: 0.25rem;">(Locked)</span>
+              </button>
+            </ng-container>
+          </ng-container>
+
+          <ng-container *ngIf="isFormEditable">
+            <button type="button" class="btn-outline" (click)="cancelForm()">Cancel</button>
+            <button type="submit" class="btn-primary" [disabled]="!isFormValid()">Save</button>
+          </ng-container>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Message -->
+<div class="toast-message" *ngIf="toastMessage">
+  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right: 0.5rem; vertical-align: middle;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+  {{ toastMessage }}
 </div>

@@ -39,7 +39,7 @@ export class App {
 
     const { username, password } = this.loginForm.value;
 
-    this.http.get<any[]>('users.json').subscribe({
+    this.http.get<any[]>('/users.json').subscribe({
       next: (users) => {
         const user = users.find(u => u.username === username && u.password === password);
         if (user) {
