@@ -1,4 +1,270 @@
-<div class="page-container">
-  <h2>Stop Payments</h2>
-  <p>This page will hold the Stop Payments features.</p>
+<div class="split-layout">
+
+  <!-- ════════════ LEFT PANEL ════════════ -->
+  <div class="left-panel">
+
+    <!-- ── Quick Search Card ── -->
+    <div class="file-upload-card">
+      <h3>Stop Payment Search</h3>
+      <div class="search-bar-row">
+        <div class="search-field">
+          <label class="search-label" for="qs-account">Account Number</label>
+          <input id="qs-account" type="text" class="form-control" placeholder="e.g. 1234567890"
+            [(ngModel)]="quickSearchAccount" (keyup.enter)="runQuickSearch()">
+        </div>
+        <div class="search-field">
+          <label class="search-label" for="qs-serial">Check Serial Number</label>
+          <input id="qs-serial" type="text" class="form-control" placeholder="e.g. CHK-0012"
+            [(ngModel)]="quickSearchSerial" (keyup.enter)="runQuickSearch()">
+        </div>
+        <div class="search-actions">
+          <button type="button" class="btn-primary flex-center" [disabled]="isLoading || (!quickSearchAccount && !quickSearchSerial)" (click)="runQuickSearch()">
+            <span *ngIf="!isLoading">Search</span>
+            <span *ngIf="isLoading" class="loader-spinner"></span>
+          </button>
+          <button type="button" class="btn-secondary" *ngIf="searchPerformed" (click)="clearSearch()">Clear</button>
+        </div>
+      </div>
+
+      <!-- Search Result Panel -->
+      <div class="search-result-box" *ngIf="searchPerformed">
+        <div *ngIf="searchResult; else noResult">
+          <div class="result-header">
+            <span class="result-title">Stop Payment Found</span>
+            <span class="status-badge" [ngClass]="getStatusClass(searchResult.status)">{{ searchResult.status }}</span>
+          </div>
+          <div class="result-grid">
+            <div class="result-item">
+              <span class="result-label">Account Number</span>
+              <span class="result-value">{{ searchResult.accountNumber }}</span>
+            </div>
+            <div class="result-item">
+              <span class="result-label">Check Serial</span>
+              <span class="result-value">{{ searchResult.serialNumber }}</span>
+            </div>
+            <div class="result-item">
+              <span class="result-label">Date</span>
+              <span class="result-value">{{ searchResult.date }}</span>
+            </div>
+            <div class="result-item">
+              <span class="result-label">Amount</span>
+              <span class="result-value">{{ formatAmount(searchResult.amount) }}</span>
+            </div>
+            <div class="result-item">
+              <span class="result-label">Approved By</span>
+              <span class="result-value">{{ searchResult.approvedBy || '—' }}</span>
+            </div>
+            <div class="result-item">
+              <span class="result-label">Approved Timestamp</span>
+              <span class="result-value">{{ (searchResult.approvedTimestamp | date:'short') || '—' }}</span>
+            </div>
+            <div class="result-item result-item-full">
+              <span class="result-label">Reason for Stop</span>
+              <span class="result-value">{{ searchResult.reason }}</span>
+            </div>
+            <div class="result-item">
+              <span class="result-label">Created By</span>
+              <span class="result-value">{{ searchResult.createdBy || '—' }}</span>
+            </div>
+            <div class="result-item">
+              <span class="result-label">Created</span>
+              <span class="result-value">{{ searchResult.createdTimestamp | date:'short' }}</span>
+            </div>
+          </div>
+          <div class="result-actions">
+            <button type="button" class="btn-outline-small" (click)="selectRecord(searchResult!)">Edit Record</button>
+            <button type="button" class="btn-danger-small" (click)="deleteRecord(searchResult!)">Remove Stop</button>
+          </div>
+        </div>
+        <ng-template #noResult>
+          <div class="no-result">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <p>No stop payment found matching the search criteria.</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+
+    <!-- ── Records Table ── -->
+    <div class="table-card">
+      <div class="form-header-actions">
+        <div class="table-title-row">
+          <h3>Stop Payment Records</h3>
+          <span class="record-count">{{ filteredRecords.length }} record(s)</span>
+        </div>
+        <div class="header-buttons">
+          <button type="button" class="btn-icon" (click)="toggleFilters()" title="Toggle Filters" [class.active-icon]="showFilters" aria-label="Toggle Filters">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+          </button>
+          <button type="button" class="btn-icon" (click)="loadAll()" title="Refresh" aria-label="Refresh Records">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">
+                <div class="th-content">Account Number</div>
+                <input *ngIf="showFilters" class="filter-input" type="text" placeholder="Filter…" [(ngModel)]="filters.accountNumber" (input)="applyFilters()">
+              </th>
+              <th scope="col">
+                <div class="th-content">Check Serial #</div>
+                <input *ngIf="showFilters" class="filter-input" type="text" placeholder="Filter…" [(ngModel)]="filters.serialNumber" (input)="applyFilters()">
+              </th>
+              <th scope="col">
+                <div class="th-content">Date</div>
+                <input *ngIf="showFilters" class="filter-input" type="text" placeholder="Filter…" [(ngModel)]="filters.date" (input)="applyFilters()">
+              </th>
+              <th scope="col">
+                <div class="th-content">Amount</div>
+                <input *ngIf="showFilters" class="filter-input" type="text" placeholder="Filter…" [(ngModel)]="filters.amount" (input)="applyFilters()">
+              </th>
+              <th scope="col">
+                <div class="th-content">Reason</div>
+                <input *ngIf="showFilters" class="filter-input" type="text" placeholder="Filter…" [(ngModel)]="filters.reason" (input)="applyFilters()">
+              </th>
+              <th scope="col">
+                <div class="th-content">Status</div>
+                <select *ngIf="showFilters" class="filter-input" [(ngModel)]="filters.status" (change)="applyFilters()">
+                  <option value="">All</option>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="RELEASED">RELEASED</option>
+                  <option value="EXPIRED">EXPIRED</option>
+                </select>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of paginatedRecords" class="clickable-row"
+              [class.selected-row]="selectedRecord?.id === r.id"
+              (click)="selectRecord(r)">
+              <td>{{ r.accountNumber }}</td>
+              <td>{{ r.serialNumber }}</td>
+              <td>{{ r.date }}</td>
+              <td>{{ formatAmount(r.amount) }}</td>
+              <td class="reason-cell">{{ r.reason }}</td>
+              <td>
+                <span class="status-badge" [ngClass]="getStatusClass(r.status)">{{ r.status }}</span>
+              </td>
+            </tr>
+            <tr *ngIf="paginatedRecords.length === 0 && !isLoading">
+              <td colspan="6" class="empty-state">No stop payment records found.</td>
+            </tr>
+            <tr *ngIf="isLoading">
+              <td colspan="6" class="empty-state">Loading…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination-controls">
+        <button type="button" class="btn-outline" (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
+        <span class="page-info">Page {{ currentPage }} of {{ totalPages }} &bull; {{ filteredRecords.length }} total</span>
+        <button type="button" class="btn-outline" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════════════ RIGHT PANEL ════════════ -->
+  <div class="right-panel">
+    <div class="form-card">
+      <div class="form-header-actions">
+        <h3>{{ selectedRecord ? 'Stop Payment Details' : 'New Stop Payment' }}</h3>
+        <div class="header-buttons">
+          <button type="button" class="btn-icon" *ngIf="selectedRecord && !isFormEditable" (click)="unlockForm()" title="Edit" aria-label="Edit Record">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button type="button" class="btn-icon" *ngIf="selectedRecord" (click)="startNew()" title="New" aria-label="New Record">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          </button>
+          <button type="button" class="btn-icon btn-icon-danger" *ngIf="selectedRecord" (click)="deleteRecord(selectedRecord!)" title="Delete" aria-label="Delete Record">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Account Number -->
+      <div class="form-group">
+        <label for="f-account">Account Number <span class="required">*</span></label>
+        <input id="f-account" type="text" class="form-control" placeholder="e.g. 1234567890"
+          [(ngModel)]="newRecord.accountNumber" [disabled]="!isFormEditable">
+      </div>
+
+      <!-- Serial Number -->
+      <div class="form-group">
+        <label for="f-serial">Check Serial Number <span class="required">*</span></label>
+        <input id="f-serial" type="text" class="form-control" placeholder="e.g. CHK-0012"
+          [(ngModel)]="newRecord.serialNumber" [disabled]="!isFormEditable">
+      </div>
+
+      <!-- Date -->
+      <div class="form-group">
+        <label for="f-date">Date <span class="required">*</span></label>
+        <input id="f-date" type="date" class="form-control"
+          [(ngModel)]="newRecord.date" [disabled]="!isFormEditable">
+      </div>
+
+      <!-- Amount -->
+      <div class="form-group">
+        <label for="f-amount">Amount <span class="required">*</span></label>
+        <input id="f-amount" type="number" class="form-control" placeholder="0.00" min="0" step="0.01"
+          [(ngModel)]="newRecord.amount" [disabled]="!isFormEditable">
+      </div>
+
+      <!-- Reason -->
+      <div class="form-group">
+        <label for="f-reason">Reason for Stop <span class="required">*</span></label>
+        <textarea id="f-reason" class="form-control reason-textarea" rows="3" placeholder="Describe the reason for this stop payment…"
+          [(ngModel)]="newRecord.reason" [disabled]="!isFormEditable"></textarea>
+      </div>
+
+      <!-- Status (edit only) -->
+      <div class="form-group" *ngIf="selectedRecord">
+        <label for="f-status">Status</label>
+        <select id="f-status" class="form-control" [(ngModel)]="newRecord.status" [disabled]="!isFormEditable">
+          <option value="ACTIVE">ACTIVE</option>
+          <option value="RELEASED">RELEASED</option>
+          <option value="EXPIRED">EXPIRED</option>
+        </select>
+      </div>
+
+      <div class="form-actions">
+        <div class="form-action-buttons">
+          <ng-container *ngIf="!isFormEditable">
+            <button type="button" class="btn-secondary" (click)="startNew()">New</button>
+            <button type="button" class="btn-secondary" *ngIf="selectedRecord" (click)="unlockForm()">Unlock</button>
+          </ng-container>
+
+          <ng-container *ngIf="isFormEditable">
+            <button type="button" class="btn-secondary" (click)="cancelEdit()">Cancel</button>
+            <button type="button" class="btn-primary" [disabled]="!isFormValid() || isSaving" (click)="submitForm()">
+              <span *ngIf="!isSaving">{{ selectedRecord ? 'Save Changes' : 'Create Stop Payment' }}</span>
+              <span *ngIf="isSaving" class="flex-center"><span class="loader-spinner"></span>&nbsp;Saving…</span>
+            </button>
+          </ng-container>
+        </div>
+      </div>
+
+      <!-- Audit Trail (Premium Footer Style) -->
+      <div style="margin: 2rem -1.5rem -1.5rem -1.5rem; background: var(--navy-blue); padding: 1.25rem 1.5rem; border-radius: 0 0 12px 12px; pointer-events: none; border-top: 1px solid var(--navy-blue-dark);">
+        <h4 style="font-size: 0.85rem; color: #f8fafc; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.2); padding-bottom: 0.5rem; margin-top: 0; font-weight: 600;">Audit Trail</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; font-size: 0.75rem;">
+          <div><strong style="color: #94a3b8;">Created By:</strong> <span style="color: #ffffff;">{{ newRecord.createdBy || '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Created At:</strong> <span style="color: #ffffff;">{{ newRecord.createdTimestamp ? (newRecord.createdTimestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Modified By:</strong> <span style="color: #ffffff;">{{ newRecord.modifiedBy || '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Modified At:</strong> <span style="color: #ffffff;">{{ newRecord.modifiedTimestamp ? (newRecord.modifiedTimestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Approved By:</strong> <span style="color: #ffffff;">{{ newRecord.approvedBy || '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Approved At:</strong> <span style="color: #ffffff;">{{ newRecord.approvedTimestamp ? (newRecord.approvedTimestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Modified Count:</strong> <span style="color: #ffffff;">{{ newRecord.modifiedCount || 0 }}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- Toast -->
+<div class="toast-message" *ngIf="toastMessage">{{ toastMessage }}</div>

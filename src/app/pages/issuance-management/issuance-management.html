@@ -4,12 +4,6 @@
       <h2>Issuance Management</h2>
       <p>This page will hold the Issuance Management features.</p>
     </div>
-    <div style="display: flex; align-items: center; gap: 0.75rem; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
-      <label for="currentUserSelect" style="font-weight: 600; color: var(--navy-blue); font-size: 0.9rem; margin-bottom: 0;">Logged in as:</label>
-      <select id="currentUserSelect" [(ngModel)]="currentUser" class="form-control" style="width: auto; padding: 0.4rem 0.75rem; min-width: 175px;">
-        <option *ngFor="let user of users" [value]="user">{{ user }}</option>
-      </select>
-    </div>
   </div>
 </div>
 
@@ -35,7 +29,10 @@
 
     <div class="table-card">
       <div class="form-header-actions">
-        <h3>Issuance Records</h3>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <h3 style="margin: 0;">Issuance Records</h3>
+          <button *ngIf="activeHistoryId" class="btn-outline-small" (click)="showAllRecords()" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; height: auto;">Clear File View</button>
+        </div>
         <div class="header-buttons">
           <button type="button" class="btn-icon" (click)="exportRecords()" title="Export" aria-label="Export Records" [disabled]="allRecords.length === 0">
             <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -117,9 +114,9 @@
               <td *ngIf="columns.approvedTimestamp">{{ record.approvedTimestamp | date:'short' }}</td>
               <td *ngIf="columns.modifiedCount">{{ record.modifiedCount }}</td>
               <td>
-                <span class="status-badge" [ngClass]="'status-' + record.recordStatus?.toLowerCase()">
+                <span class="status-badge" [ngClass]="getStatusClass(record.recordStatus)">
                   <svg *ngIf="record.recordStatus === 'APPROVED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 2px; display: inline-block; margin-top: -2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                  <svg *ngIf="record.recordStatus === 'PENDING' || record.recordStatus === 'NEW' || record.recordStatus === 'IMPORTED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 2px; display: inline-block; margin-top: -2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                  <svg *ngIf="record.recordStatus === 'ISSUED' || record.recordStatus === 'NEW' || record.recordStatus === 'IMPORTED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 2px; display: inline-block; margin-top: -2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                   {{ record.recordStatus }}
                 </span>
               </td>
@@ -131,11 +128,18 @@
         </table>
       </div>
 
-      <div class="table-footer-actions" style="margin-top: 1.5rem; display: flex; gap: 0.75rem; justify-content: flex-end; flex-wrap: wrap;">
-        <button type="button" class="btn-primary-small" (click)="openBulkModal('SUBMIT')" [disabled]="!hasSelectedRecords" style="padding: 0.5rem 1rem;">Submit Selected</button>
-        <button type="button" class="btn-success-small" (click)="openBulkModal('APPROVE')" [disabled]="!hasSelectedRecords">Approve Selected</button>
-        <button type="button" class="btn-danger" (click)="openBulkModal('VOID')" [disabled]="!hasSelectedRecords" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Void Selected</button>
-        <button type="button" class="btn-danger" (click)="openBulkModal('DELETE')" [disabled]="!hasSelectedRecords" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Delete Selected</button>
+      <div *ngIf="newCount > 0" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.5); color: #b45309; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 1.5rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 500;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Action Required: You have {{ newCount }} new record(s) pending initial decision processing. These must be acted upon to maintain system compliance.
+      </div>
+
+      <div class="table-footer-actions" *ngIf="allRecords.length > 0" style="margin-top: 1.5rem; display: flex; gap: 0.75rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+        <select [(ngModel)]="selectedBulkAction" [ngModelOptions]="{standalone: true}" class="form-control" style="width: auto; min-width: 180px;">
+          <option value="" disabled selected>Select bulk decision...</option>
+          <option value="SUBMIT">Submit Selected</option>
+          <option *ngIf="hasPendingRecords" value="APPROVE">Approve Selected</option>
+        </select>
+        <button type="button" class="btn-primary" [disabled]="!canExecuteBulkDecision" (click)="executeBulkDecision()" style="padding: 0.75rem 1.5rem; width: auto; margin-top: 0;">Apply Decision</button>
       </div>
       
       <div class="pagination-controls">
@@ -149,9 +153,8 @@
   <!-- Right Side: Form Area -->
   <div class="right-panel">
     <div class="form-card">
-      <div class="form-header-actions">
-        <h3>Issuance Form</h3>
-        <button type="button" class="btn-outline-small" (click)="startNewRecord()">New</button>
+      <div class="form-header-actions" style="margin-bottom: 1.5rem;">
+        <h3 style="margin-bottom: 0;">Issuance Form</h3>
       </div>
       <form (ngSubmit)="submitForm()" class="issuance-form">
         <div class="form-group">
@@ -179,22 +182,20 @@
           <input type="number" id="amountValue" name="amountValue" [(ngModel)]="newRecord.amount" class="form-control" step="0.01" required [disabled]="!isFormEditable">
         </div>
 
+
+
         <div class="form-actions form-action-buttons">
           <ng-container *ngIf="!isFormEditable">
             <button type="button" class="btn-secondary" (click)="startNewRecord()">New</button>
             <ng-container *ngIf="selectedRecord">
-              <button type="button" class="btn-secondary" *ngIf="selectedRecord.recordStatus !== 'VOID' && selectedRecord.recordStatus !== 'DELETED'" (click)="unlockForm()">Unlock</button>
-              
-              <button type="button" class="btn-danger" *ngIf="selectedRecord.recordStatus !== 'VOID' && selectedRecord.recordStatus !== 'DELETED'" (click)="voidRecordFromLocked()">Void</button>
-              <button type="button" class="btn-outline" *ngIf="selectedRecord.recordStatus === 'VOID'" (click)="revertVoidFromLocked()">Revert Void</button>
-              
-              <button type="button" class="btn-danger" *ngIf="selectedRecord.recordStatus !== 'VOID' && selectedRecord.recordStatus !== 'DELETED'" (click)="deleteRecord()">Delete</button>
-              
-              <button type="button" class="btn-primary" *ngIf="selectedRecord.recordStatus === 'NEW' || selectedRecord.recordStatus === 'IMPORTED'" (click)="submitRecordForApprovalFromLocked()">Submit</button>
-              
-              <button type="button" class="btn-success" *ngIf="selectedRecord.recordStatus === 'PENDING'" [title]="!canApprove(selectedRecord) ? 'Maker cannot be checker' : ''" [disabled]="!canApprove(selectedRecord)" (click)="approveRecordFromLocked()">
-                Approve <span *ngIf="!canApprove(selectedRecord)" style="font-size: 0.85em; margin-left: 0.25rem;">(Locked)</span>
-              </button>
+              <button type="button" class="btn-secondary" *ngIf="['IMPORTED', 'NEW', 'APPROVED', 'ISSUED'].includes(selectedRecord.recordStatus || '')" (click)="unlockForm()">Unlock</button>
+              <ng-container *ngIf="availableActions.length > 0">
+                <select [(ngModel)]="selectedAction" [ngModelOptions]="{standalone: true}" class="form-control" style="width: auto; min-width: 150px; display: inline-block; margin-left: auto;">
+                  <option value="" disabled selected>Select decision...</option>
+                  <option *ngFor="let act of availableActions" [value]="act">{{ act }}</option>
+                </select>
+                <button type="button" class="btn-primary" [disabled]="!selectedAction" (click)="executeDecision()">Apply Decision</button>
+              </ng-container>
             </ng-container>
           </ng-container>
 
@@ -204,7 +205,58 @@
           </ng-container>
         </div>
       </form>
+      
+      <div style="margin: 2rem -1.5rem -1.5rem -1.5rem; background: var(--navy-blue); padding: 1rem 1.5rem; border-radius: 0 0 12px 12px; pointer-events: none; border-top: 1px solid var(--navy-blue-dark);">
+        <h4 style="font-size: 0.8rem; color: #f8fafc; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.2); padding-bottom: 0.5rem; margin-top: 0;">Audit Trail</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; font-size: 0.7rem;">
+          <div><strong style="color: #94a3b8;">Created By:</strong> <span style="color: #ffffff;">{{ newRecord.createdBy || '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Created At:</strong> <span style="color: #ffffff;">{{ newRecord.createdTimestamp ? (newRecord.createdTimestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Modified By:</strong> <span style="color: #ffffff;">{{ newRecord.modifiedBy || '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Modified At:</strong> <span style="color: #ffffff;">{{ newRecord.modifiedTimestamp ? (newRecord.modifiedTimestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Approved By:</strong> <span style="color: #ffffff;">{{ newRecord.approvedBy || '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Approved At:</strong> <span style="color: #ffffff;">{{ newRecord.approvedTimestamp ? (newRecord.approvedTimestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
+          <div><strong style="color: #94a3b8;">Modified Count:</strong> <span style="color: #ffffff;">{{ newRecord.modifiedCount || 0 }}</span></div>
+        </div>
+      </div>
     </div>
+  </div>
+</div>
+
+<!-- History Section -->
+<div class="history-section" [class.collapsed]="isHistoryCollapsed">
+  <div class="history-header" (click)="toggleHistory()">
+    <h3>Uploaded Issuance Files</h3>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" [class.rotated]="isHistoryCollapsed">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+    </svg>
+  </div>
+  <div class="history-content" *ngIf="!isHistoryCollapsed">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>File Name</th>
+          <th>Date Uploaded</th>
+          <th>File Status</th>
+          <th>Summary</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let history of historicalFiles" class="clickable-row" (click)="loadHistoricalFile(history)">
+          <td>{{ history.fileName }}</td>
+          <td>{{ history.uploadDate | date:'short' }}</td>
+          <td><span class="status-badge" [ngClass]="getStatusClass(getDynamicFileStatus(history))">{{ getDynamicFileStatus(history) }}</span></td>
+          <td class="summary-cell" style="font-size: 0.85rem; color: #475569;">{{ getHistorySummary(history) }}</td>
+          <td style="display: flex; gap: 0.5rem; align-items: center; justify-content: flex-start;">
+            <button class="btn-outline-small" (click)="loadHistoricalFile(history); $event.stopPropagation()">View Data</button>
+            <button class="btn-outline-small" style="color: #ef4444; border-color: #fca5a5; background: #fef2f2;" [disabled]="!canDeleteHistoricalFile(history)" [style.opacity]="!canDeleteHistoricalFile(history) ? '0.5' : '1'" (click)="deleteHistoricalFile(history); $event.stopPropagation()">Delete File</button>
+          </td>
+        </tr>
+        <tr *ngIf="historicalFiles.length === 0">
+          <td colspan="5" class="empty-state">No historical data available.</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -212,4 +264,42 @@
 <div class="toast-message" *ngIf="toastMessage">
   <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right: 0.5rem; vertical-align: middle;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
   {{ toastMessage }}
+</div>
+
+<!-- Bulk Action Modal -->
+<div class="modal-overlay" *ngIf="bulkModalVisible">
+  <div class="modal-content" style="max-width: 600px;">
+    <h3>Confirm Bulk {{ bulkActionType }}</h3>
+    <p>Are you sure you want to <strong>{{ bulkActionType }}</strong> the following {{ selectedBulkRecords.length }} record(s)?</p>
+    
+    <div style="max-height: 250px; overflow-y: auto; margin: 1rem 0; border: 1px solid #e2e8f0; border-radius: 4px;">
+      <table class="data-table" style="font-size: 0.85rem; margin: 0;">
+        <thead style="position: sticky; top: 0; background: white; z-index: 1;">
+          <tr>
+            <th>Serial Number</th>
+            <th>Beneficiary</th>
+            <th>Amount</th>
+            <th>Current Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let record of selectedBulkRecords">
+            <td>{{ record.serialNumber }}</td>
+            <td>{{ record.beneficiary }}</td>
+            <td>{{ record.amount | number:'1.2-2' }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="'status-' + record.recordStatus?.toLowerCase()" style="font-size: 0.75rem; padding: 0.15rem 0.4rem;">
+                {{ record.recordStatus }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+      <button class="btn-outline" (click)="closeBulkModal()">Cancel</button>
+      <button class="btn-primary" (click)="confirmBulkAction()">Confirm</button>
+    </div>
+  </div>
 </div>
