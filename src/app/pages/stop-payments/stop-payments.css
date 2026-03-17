@@ -9,6 +9,11 @@
 .left-panel  { flex: 7; min-width: 0; }
 .right-panel { flex: 3; min-width: 300px; }
 
+.full-width-panel {
+  width: 100%;
+  padding: 1rem 2.5rem 2.5rem;
+}
+
 /* ── Cards ───────────────────────────────────────────────── */
 .file-upload-card, .table-card, .form-card {
   background: var(--white);
@@ -442,6 +447,56 @@
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 800px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  color: var(--navy-blue);
+  border-bottom: 2px solid #f0f2f5;
+  padding-bottom: 0.75rem;
+}
+
+.btn-primary-small {
+  background: var(--navy-blue);
+  color: var(--white);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.btn-primary-small:hover {
+  background: var(--navy-blue-dark);
+}
+
+.main-content-area {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
 @media (max-width: 1024px) {
   .split-layout { flex-direction: column; }
   .left-panel, .right-panel { width: 100%; }

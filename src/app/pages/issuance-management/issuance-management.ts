@@ -27,7 +27,7 @@ interface IssuanceRecord {
   date: string;
   serialNumber: string;
   accountNumber: string;
-  beneficiary: string;
+  beneficiaryName: string;
   amount: number;
   // standard audit fields
   createdBy?: string;
@@ -63,6 +63,7 @@ export class IssuanceManagement implements OnInit {
   allRecords: IssuanceRecord[] = [];
   filteredRecords: IssuanceRecord[] = [];
   isLoading: boolean = false;
+  showFormModal: boolean = false;
 
   ngOnInit() {
     this.loadFromApi();
@@ -163,7 +164,7 @@ export class IssuanceManagement implements OnInit {
     date: '',
     serialNumber: '',
     accountNumber: '',
-    beneficiary: '',
+    beneficiaryName: '',
     amount: ''
   };
 
@@ -172,7 +173,7 @@ export class IssuanceManagement implements OnInit {
   toggleFilters() {
     this.showFilters = !this.showFilters;
     if (!this.showFilters) {
-      this.filters = { date: '', serialNumber: '', accountNumber: '', beneficiary: '', amount: '' };
+      this.filters = { date: '', serialNumber: '', accountNumber: '', beneficiaryName: '', amount: '' };
       this.applyFilters();
     }
   }
@@ -182,7 +183,7 @@ export class IssuanceManagement implements OnInit {
     date: true,
     serialNumber: true,
     accountNumber: true,
-    beneficiary: true,
+    beneficiaryName: true,
     amount: true,
     createdBy: false,
     createdTimestamp: false,
@@ -205,7 +206,7 @@ export class IssuanceManagement implements OnInit {
       date: '',
       serialNumber: '',
       accountNumber: '',
-      beneficiary: '',
+      beneficiaryName: '',
       amount: 0,
       createdBy: '',
       createdTimestamp: '',
@@ -348,7 +349,7 @@ export class IssuanceManagement implements OnInit {
               date: parts[0]?.trim() || '',
               serialNumber: parts[1]?.trim() || '',
               accountNumber: parts[2]?.trim() || '',
-              beneficiary: parts[3]?.trim() || '',
+              beneficiaryName: parts[3]?.trim() || '',
               amount: parseFloat(parts[4]) || 0,
               createdBy: this.currentUser,
               createdTimestamp: new Date().toISOString(),
@@ -426,7 +427,7 @@ export class IssuanceManagement implements OnInit {
       const matchDate = record.date.includes(this.filters.date);
       const matchSerial = record.serialNumber.toLowerCase().includes(this.filters.serialNumber.toLowerCase());
       const matchAccount = record.accountNumber.toLowerCase().includes(this.filters.accountNumber.toLowerCase());
-      const matchBeneficiary = record.beneficiary.toLowerCase().includes(this.filters.beneficiary.toLowerCase());
+      const matchBeneficiary = record.beneficiaryName.toLowerCase().includes(this.filters.beneficiaryName.toLowerCase());
       const matchAmount = this.filters.amount ? record.amount.toString().includes(this.filters.amount) : true;
       
       return matchDate && matchSerial && matchAccount && matchBeneficiary && matchAmount;
@@ -452,7 +453,7 @@ export class IssuanceManagement implements OnInit {
       this.newRecord.date.trim() !== '' &&
       this.newRecord.serialNumber.trim() !== '' &&
       this.newRecord.accountNumber.trim() !== '' &&
-      this.newRecord.beneficiary.trim() !== '' &&
+      this.newRecord.beneficiaryName.trim() !== '' &&
       this.newRecord.amount > 0
     );
   }
@@ -461,12 +462,19 @@ export class IssuanceManagement implements OnInit {
     this.selectedRecord = record;
     this.newRecord = { ...record };
     this.isFormEditable = false;
+    this.showFormModal = true;
   }
 
   startNewRecord() {
     this.selectedRecord = null;
     this.newRecord = this.getEmptyRecord();
     this.isFormEditable = true;
+    this.showFormModal = true;
+  }
+
+  closeFormModal() {
+    this.showFormModal = false;
+    this.selectedRecord = null; // Clear selection when closing
   }
 
   unlockForm() {
@@ -478,7 +486,7 @@ export class IssuanceManagement implements OnInit {
       this.newRecord = { ...this.selectedRecord };
       this.isFormEditable = false;
     } else {
-      this.startNewRecord();
+      this.showFormModal = false;
     }
   }
 
@@ -897,6 +905,7 @@ export class IssuanceManagement implements OnInit {
           Object.assign(this.allRecords[index], this.newRecord);
           this.selectedRecord = this.allRecords[index];
           this.saveRecord(this.allRecords[index]);
+          this.showFormModal = false;
         }
       } else {
         this.newRecord.id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -910,6 +919,7 @@ export class IssuanceManagement implements OnInit {
         // The backend PUT will upsert because the record may not yet exist.
         // Instead, we piggyback by posting it as a file with no fileId.
         this.saveRecord(created);
+        this.showFormModal = false;
       }
       this.applyFilters();
       this.isFormEditable = false;

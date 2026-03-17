@@ -13,6 +13,7 @@ interface StopPayment {
   date: string;
   amount: number;
   reason: string;
+  beneficiaryName: string;
   status?: string;
   // standard audit fields
   createdBy?: string;
@@ -49,6 +50,7 @@ export class StopPayments implements OnInit {
   isLoading = false;
   isSaving = false;
   toastMessage: string | null = null;
+  showFormModal = false;
 
   // ── Pagination ──────────────────────────────────────────────────────────────
   currentPage = 1;
@@ -77,6 +79,7 @@ export class StopPayments implements OnInit {
     date: '',
     amount: '',
     reason: '',
+    beneficiaryName: '',
     status: '',
   };
 
@@ -88,8 +91,9 @@ export class StopPayments implements OnInit {
       const matchDate    = r.date.includes(f.date);
       const matchAmount  = f.amount ? r.amount.toString().includes(f.amount) : true;
       const matchReason  = r.reason.toLowerCase().includes(f.reason.toLowerCase());
+      const matchBeneficiary = r.beneficiaryName.toLowerCase().includes(f.beneficiaryName.toLowerCase());
       const matchStatus  = f.status ? (r.status || '').toLowerCase() === f.status.toLowerCase() : true;
-      return matchAccount && matchSerial && matchDate && matchAmount && matchReason && matchStatus;
+      return matchAccount && matchSerial && matchDate && matchAmount && matchReason && matchBeneficiary && matchStatus;
     });
     this.currentPage = 1;
   }
@@ -97,7 +101,7 @@ export class StopPayments implements OnInit {
   toggleFilters() {
     this.showFilters = !this.showFilters;
     if (!this.showFilters) {
-      this.filters = { accountNumber: '', serialNumber: '', date: '', amount: '', reason: '', status: '' };
+      this.filters = { accountNumber: '', serialNumber: '', date: '', amount: '', reason: '', beneficiaryName: '', status: '' };
       this.applyFilters();
     }
   }
@@ -178,6 +182,7 @@ export class StopPayments implements OnInit {
   emptyRecord(): StopPayment {
     return {
       accountNumber: '', serialNumber: '', date: '', amount: 0, reason: '',
+      beneficiaryName: '',
       status: 'ACTIVE'
     };
   }
@@ -187,12 +192,19 @@ export class StopPayments implements OnInit {
     this.newRecord = { ...r };
     this.isFormEditable = false;
     this.searchResult = null;
+    this.showFormModal = true;
   }
 
   startNew() {
     this.selectedRecord = null;
     this.newRecord = this.emptyRecord();
     this.isFormEditable = true;
+    this.showFormModal = true;
+  }
+
+  closeFormModal() {
+    this.showFormModal = false;
+    this.selectedRecord = null;
   }
 
   unlockForm() {
@@ -204,7 +216,7 @@ export class StopPayments implements OnInit {
       this.newRecord = { ...this.selectedRecord };
       this.isFormEditable = false;
     } else {
-      this.startNew();
+      this.showFormModal = false;
     }
   }
 
@@ -213,6 +225,7 @@ export class StopPayments implements OnInit {
       this.newRecord.accountNumber.trim() !== '' &&
       this.newRecord.serialNumber.trim() !== '' &&
       this.newRecord.date.trim() !== '' &&
+      this.newRecord.beneficiaryName.trim() !== '' &&
       this.newRecord.amount > 0 &&
       this.newRecord.reason.trim() !== ''
     );
@@ -239,6 +252,7 @@ export class StopPayments implements OnInit {
           this.applyFilters();
           this.isFormEditable = false;
           this.isSaving = false;
+          this.showFormModal = false;
           this.showToast('Stop payment updated successfully.');
           this.cdr.detectChanges();
         },
@@ -262,9 +276,10 @@ export class StopPayments implements OnInit {
         next: (saved) => {
           this.allRecords.unshift(saved);
           this.applyFilters();
-          this.startNew();
+          this.isFormEditable = false;
           this.isSaving = false;
-          this.showToast('Stop payment created successfully.');
+          this.showFormModal = false;
+          this.showToast('New stop payment record created.');
           this.cdr.detectChanges();
         },
         error: (err) => {

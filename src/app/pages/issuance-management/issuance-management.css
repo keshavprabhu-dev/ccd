@@ -11,9 +11,19 @@
   min-width: 0; 
 }
 
+.left-panel {
+  flex: 7;
+  min-width: 0; 
+}
+
 .right-panel {
   flex: 3;
   min-width: 300px;
+}
+
+.full-width-panel {
+  width: 100%;
+  padding: 1rem 2.5rem 2.5rem;
 }
 
 .card, .table-card, .form-card {
@@ -541,6 +551,11 @@
   color: var(--navy-blue);
   border-bottom: 2px solid #f0f2f5;
   padding-bottom: 0.75rem;
+}
+
+.issuance-form {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
 /* History Section */
