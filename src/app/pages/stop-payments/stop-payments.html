@@ -3,65 +3,38 @@
   <!-- ════════════ SEARCH & TABLE AREA ════════════ -->
   <div class="main-content-area">
 
-    <!-- ── Quick Search Card ── -->
-    <div class="file-upload-card">
-      <h3>Stop Payment Search</h3>
-      <div class="search-bar-row">
-        <div class="search-field">
-          <label class="search-label" for="qs-account">Account Number</label>
-          <input id="qs-account" type="text" class="form-control" placeholder="e.g. 1234567890"
-            [(ngModel)]="quickSearchAccount" (keyup.enter)="runQuickSearch()">
-        </div>
-        <div class="search-field">
-          <label class="search-label" for="qs-serial">Check Serial Number</label>
-          <input id="qs-serial" type="text" class="form-control" placeholder="e.g. CHK-0012"
-            [(ngModel)]="quickSearchSerial" (keyup.enter)="runQuickSearch()">
-        </div>
-        <div class="search-actions">
-          <button type="button" class="btn-primary flex-center" [disabled]="isLoading || (!quickSearchAccount && !quickSearchSerial)" (click)="runQuickSearch()">
-            <span *ngIf="!isLoading">Search</span>
-            <span *ngIf="isLoading" class="loader-spinner"></span>
-          </button>
-          <button type="button" class="btn-secondary" *ngIf="searchPerformed" (click)="clearSearch()">Clear</button>
-        </div>
+    <!-- ── Stop Payment Statistics Header ── -->
+    <div class="table-card stats-header-card">
+      <div class="form-header-actions">
+        <h3>Stop Payment Statistics (By Date)</h3>
+        <button type="button" class="btn-icon" (click)="loadAll()" title="Refresh Stats" aria-label="Refresh Stats">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        </button>
       </div>
-
-      <!-- Search Result Panel -->
-      <div class="search-result-box" *ngIf="searchPerformed">
-        <div *ngIf="searchResult; else noResult">
-          <div class="result-header">
-            <span class="result-title">Stop Payment Found</span>
-            <span class="status-badge" [ngClass]="getStatusClass(searchResult.status)">{{ searchResult.status }}</span>
-          </div>
-          <div class="result-grid">
-            <div class="result-item">
-              <span class="result-label">Account Number</span>
-              <span class="result-value">{{ searchResult.accountNumber }}</span>
-            </div>
-            <div class="result-item">
-              <span class="result-label">Check Serial</span>
-              <span class="result-value">{{ searchResult.serialNumber }}</span>
-            </div>
-            <div class="result-item">
-              <span class="result-label">Date</span>
-              <span class="result-value">{{ searchResult.date }}</span>
-            </div>
-            <div class="result-item">
-              <span class="result-label">Amount</span>
-              <span class="result-value">{{ formatAmount(searchResult.amount) }}</span>
-            </div>
-          </div>
-          <div class="result-actions">
-            <button type="button" class="btn-outline-small" (click)="selectRecord(searchResult!)">Edit Record</button>
-            <button type="button" class="btn-danger-small" (click)="deleteRecord(searchResult!)">Remove Stop</button>
-          </div>
-        </div>
-        <ng-template #noResult>
-          <div class="no-result">
-            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            <p>No stop payment found matching the search criteria.</p>
-          </div>
-        </ng-template>
+      <div class="table-responsive">
+        <table class="data-table stats-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th class="text-right">Total Items</th>
+              <th class="text-right">Total Amount</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let stat of stopStats" class="clickable-row" (click)="viewStatDetails(stat)">
+              <td>{{ stat.date }}</td>
+              <td class="text-right">{{ stat.totalItems }}</td>
+              <td class="text-right">{{ formatAmount(stat.totalAmount) }}</td>
+              <td class="text-center">
+                <button type="button" class="btn-outline-small" (click)="viewStatDetails(stat)">View Details</button>
+              </td>
+            </tr>
+            <tr *ngIf="stopStats.length === 0">
+              <td colspan="4" class="text-center" style="padding: 2rem; color: #64748b;">No stop payment data available to aggregate.</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -137,6 +110,7 @@
               <td class="reason-cell">{{ r.reason }}</td>
               <td>
                 <span class="status-badge" [ngClass]="getStatusClass(r.status)">{{ r.status }}</span>
+                <span *ngIf="r.isDuplicate" class="status-badge status-duplicate" style="margin-top: 4px; display: block; text-align: center;">DUPLICATE</span>
               </td>
             </tr>
             <tr *ngIf="paginatedRecords.length === 0 && !isLoading">
@@ -162,11 +136,12 @@
 <div class="modal-overlay" *ngIf="showFormModal" (click)="closeFormModal()">
   <div class="modal-content" (click)="$event.stopPropagation()">
     <div class="form-header-actions" style="margin-bottom: 1.5rem;">
-      <h3 style="margin-bottom: 0;">{{ selectedRecord ? 'Stop Payment Details' : 'New Stop Payment' }}</h3>
-      <div style="display: flex; gap: 0.5rem; align-items: center;">
-        <!-- New Button -->
-        <button type="button" class="btn-icon" (click)="startNew()" title="New Stop Payment" aria-label="New Stop Payment">
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+      <h3 style="margin-bottom: 0;">{{ selectedRecord ? 'Stop Payment Details' : 'New Stop Payment Request' }}</h3>
+      <span *ngIf="newRecord.isDuplicate" class="status-badge status-duplicate" style="margin-left: 1rem;">DUPLICATE RECORD DETECTED</span>
+      <div style="display: flex; gap: 0.5rem; align-items: center; margin-left: auto;">
+        <!-- Save Changes Button (Header) -->
+        <button type="button" class="btn-icon" *ngIf="isFormEditable" [disabled]="isSaving" (click)="submitForm()" title="Save Changes" aria-label="Save Changes">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
         </button>
         <!-- Unlock Button -->
         <button type="button" class="btn-icon" *ngIf="selectedRecord && !isFormEditable" (click)="unlockForm()" title="Unlock Form" aria-label="Unlock Form">
@@ -184,49 +159,48 @@
     </div>
 
     <!-- Scrollable Form Area -->
-    <div style="overflow-y: auto; flex: 1; padding-right: 10px;">
+    <form (ngSubmit)="submitForm()" style="overflow-y: auto; flex: 1; padding-right: 10px;">
       <div class="form-group">
         <label for="f-account">Account Number <span class="required">*</span></label>
-        <input id="f-account" type="text" class="form-control" placeholder="e.g. 1234567890"
+        <input id="f-account" name="f-account" type="text" class="form-control" placeholder="e.g. 1234567890"
           [(ngModel)]="newRecord.accountNumber" [disabled]="!isFormEditable">
       </div>
 
       <div class="form-group">
         <label for="f-serial">Check Serial Number <span class="required">*</span></label>
-        <input id="f-serial" type="text" class="form-control" placeholder="e.g. CHK-0012"
+        <input id="f-serial" name="f-serial" type="text" class="form-control" placeholder="e.g. CHK-0012"
           [(ngModel)]="newRecord.serialNumber" [disabled]="!isFormEditable">
       </div>
 
       <div class="form-group">
         <label for="f-date">Date <span class="required">*</span></label>
-        <input id="f-date" type="date" class="form-control"
+        <input id="f-date" name="f-date" type="date" class="form-control"
           [(ngModel)]="newRecord.date" [disabled]="!isFormEditable">
       </div>
 
       <div class="form-group">
         <label for="f-beneficiary">Beneficiary Name <span class="required">*</span></label>
-        <input id="f-beneficiary" type="text" class="form-control" placeholder="Enter beneficiary name…"
+        <input id="f-beneficiary" name="f-beneficiary" type="text" class="form-control" placeholder="Enter beneficiary name…"
           [(ngModel)]="newRecord.beneficiaryName" [disabled]="!isFormEditable">
       </div>
 
       <div class="form-group">
         <label for="f-amount">Amount <span class="required">*</span></label>
-        <input id="f-amount" type="number" class="form-control" placeholder="0.00" min="0" step="0.01"
+        <input id="f-amount" name="f-amount" type="number" class="form-control" placeholder="0.00" min="0" step="0.01"
           [(ngModel)]="newRecord.amount" [disabled]="!isFormEditable">
       </div>
 
       <div class="form-group">
-        <label for="f-reason">Reason for Stop <span class="required">*</span></label>
-        <textarea id="f-reason" class="form-control reason-textarea" rows="3" placeholder="Describe the reason for this stop payment…"
+        <label for="f-reason">Reason for Stop</label>
+        <textarea id="f-reason" name="f-reason" class="form-control reason-textarea" rows="3" placeholder="Describe the reason for this stop payment…"
           [(ngModel)]="newRecord.reason" [disabled]="!isFormEditable"></textarea>
       </div>
 
       <div class="form-group" *ngIf="selectedRecord">
         <label for="f-status">Status</label>
-        <select id="f-status" class="form-control" [(ngModel)]="newRecord.status" [disabled]="!isFormEditable">
-          <option value="ACTIVE">ACTIVE</option>
+        <select id="f-status" name="f-status" class="form-control" title="Record Status" [(ngModel)]="newRecord.status" [disabled]="!isFormEditable">
+          <option value="STOP">STOP</option>
           <option value="RELEASED">RELEASED</option>
-          <option value="EXPIRED">EXPIRED</option>
         </select>
       </div>
 
@@ -235,13 +209,13 @@
           <ng-container *ngIf="isFormEditable">
             <button type="button" class="btn-secondary" (click)="cancelEdit()">Cancel</button>
             <button type="button" class="btn-primary" [disabled]="!isFormValid() || isSaving" (click)="submitForm()">
-              <span *ngIf="!isSaving">{{ selectedRecord ? 'Save Changes' : 'Create Stop Payment' }}</span>
+              <span *ngIf="!isSaving">Save Changes</span>
               <span *ngIf="isSaving" class="flex-center"><span class="loader-spinner"></span>&nbsp;Saving…</span>
             </button>
           </ng-container>
         </div>
       </div>
-    </div>
+    </form>
 
     <!-- Audit Trail Footer -->
     <div style="margin: 2rem -2rem -2rem -2rem; background: var(--navy-blue); padding: 1.25rem 2rem; border-radius: 0 0 12px 12px; pointer-events: none; border-top: 1px solid var(--navy-blue-dark); flex-shrink: 0;">
@@ -263,4 +237,48 @@
 <div class="toast-message" *ngIf="toastMessage">
   <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right: 0.5rem; vertical-align: middle;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
   {{ toastMessage }}
+</div>
+
+<!-- ── Stats Details Modal ── -->
+<div class="modal-overlay" *ngIf="showStatsModal" (click)="closeStatsModal()">
+  <div class="modal-container stats-details-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Stop Payments - {{ selectedStat?.date }}</h2>
+      <button type="button" class="btn-close" (click)="closeStatsModal()" title="Close">&times;</button>
+    </div>
+    
+    <div class="results-summary" style="padding: 1rem 1.5rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between;">
+      <span><strong>Total Items:</strong> {{ selectedStat?.totalItems }}</span>
+      <span><strong>Total Amount:</strong> {{ formatAmount(selectedStat?.totalAmount || 0) }}</span>
+    </div>
+
+    <div class="modal-body" style="padding: 0; max-height: 60vh; overflow-y: auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Account Number</th>
+            <th>Check Serial #</th>
+            <th>Beneficiary</th>
+            <th class="text-right">Amount</th>
+            <th class="text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of selectedStat?.records">
+            <td>{{ r.accountNumber }}</td>
+            <td>{{ r.serialNumber }}</td>
+            <td>{{ r.beneficiaryName }}</td>
+            <td class="text-right">{{ formatAmount(r.amount) }}</td>
+            <td class="text-center">
+              <span class="status-badge" [ngClass]="getStatusClass(r.status)">{{ r.status }}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-secondary" (click)="closeStatsModal()">Close</button>
+    </div>
+  </div>
 </div>

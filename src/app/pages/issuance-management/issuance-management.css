@@ -394,6 +394,7 @@
 .status-void, .status-void-pending { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
 .status-deleted { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
 .status-delete-pending { background-color: #fca5a5; color: #7f1d1d; border: 1px solid #f87171; }
+.status-duplicate { background-color: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 
 .btn-primary-small {
   background: var(--navy-blue);
@@ -575,6 +576,7 @@
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
   transition: background-color 0.2s;
 }

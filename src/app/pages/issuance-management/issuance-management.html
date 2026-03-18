@@ -120,6 +120,7 @@
                   <svg *ngIf="record.recordStatus === 'ISSUED' || record.recordStatus === 'NEW' || record.recordStatus === 'IMPORTED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 2px; display: inline-block; margin-top: -2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                   {{ record.recordStatus }}
                 </span>
+                <span *ngIf="record.isDuplicate" class="status-badge status-duplicate" style="margin-top: 4px; display: block; text-align: center;">DUPLICATE</span>
               </td>
             </tr>
             <tr *ngIf="paginatedRecords.length === 0">
@@ -195,7 +196,8 @@
   <div class="modal-content" (click)="$event.stopPropagation()">
     <div class="form-header-actions" style="margin-bottom: 1.5rem;">
       <h3 style="margin-bottom: 0;">{{ selectedRecord ? 'Edit Issuance Record' : 'New Issuance Record' }}</h3>
-      <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <span *ngIf="newRecord.isDuplicate" class="status-badge status-duplicate" style="margin-left: 1rem;">DUPLICATE RECORD DETECTED</span>
+      <div style="display: flex; gap: 0.5rem; align-items: center; margin-left: auto;">
         <!-- New Record Button -->
         <button type="button" class="btn-icon" (click)="startNewRecord()" title="New Record" aria-label="New Record">
           <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>

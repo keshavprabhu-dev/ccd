@@ -25,6 +25,14 @@ interface StopPayment {
   approvedTimestamp?: string;
   authStatus?: string;        // null | 'U' | 'A'
   selected?: boolean;
+  isDuplicate?: boolean;
+}
+
+interface StopStat {
+  date: string;
+  totalAmount: number;
+  totalItems: number;
+  records: StopPayment[];
 }
 
 @Component({
@@ -106,48 +114,35 @@ export class StopPayments implements OnInit {
     }
   }
 
-  // ── Quick Search (search bar at top) ───────────────────────────────────────
-  quickSearchAccount = '';
-  quickSearchSerial = '';
-  searchResult: StopPayment | null = null;
-  searchPerformed = false;
+  // ── Stats (Header Table) ──────────────────────────────────────────────────
+  stopStats: StopStat[] = [];
+  showStatsModal = false;
+  selectedStat: StopStat | null = null;
 
-  runQuickSearch() {
-    if (!this.quickSearchAccount && !this.quickSearchSerial) return;
-    this.isLoading = true;
-    this.searchPerformed = false;
-    this.searchResult = null;
-
-    let params = new HttpParams();
-    if (this.quickSearchAccount) params = params.set('accountNumber', this.quickSearchAccount);
-    if (this.quickSearchSerial)  params = params.set('serialNumber',  this.quickSearchSerial);
-
-    this.http.get<StopPayment[]>(API, { params }).subscribe({
-      next: (results) => {
-        this.searchPerformed = true;
-        this.isLoading = false;
-        if (results.length > 0) {
-          this.searchResult = results[0];
-          this.showToast(`Found ${results.length} matching stop payment(s).`);
-        } else {
-          this.showToast('No stop payment found for those criteria.');
-        }
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        this.isLoading = false;
-        console.error(err);
-        this.showToast('⚠️ Could not connect to backend.');
-        this.cdr.detectChanges();
-      }
+  calculateStats() {
+    const grouped = new Map<string, { totalAmount: number, totalItems: number, records: StopPayment[] }>();
+    this.allRecords.forEach(r => {
+      const d = r.date || 'Unknown';
+      const existing = grouped.get(d) || { totalAmount: 0, totalItems: 0, records: [] };
+      existing.totalAmount += Number(r.amount || 0);
+      existing.totalItems += 1;
+      existing.records.push(r);
+      grouped.set(d, existing);
     });
+    this.stopStats = Array.from(grouped.entries()).map(([date, data]) => ({
+      date,
+      ...data
+    })).sort((a, b) => b.date.localeCompare(a.date));
   }
 
-  clearSearch() {
-    this.quickSearchAccount = '';
-    this.quickSearchSerial = '';
-    this.searchResult = null;
-    this.searchPerformed = false;
+  viewStatDetails(stat: StopStat) {
+    this.selectedStat = stat;
+    this.showStatsModal = true;
+  }
+
+  closeStatsModal() {
+    this.showStatsModal = false;
+    this.selectedStat = null;
   }
 
   // ── Load All ──────────────────────────────────────────────────────────────
@@ -160,7 +155,9 @@ export class StopPayments implements OnInit {
     this.http.get<StopPayment[]>(API).subscribe({
       next: (data) => {
         this.allRecords = data;
+        this.markDuplicates();
         this.applyFilters();
+        this.calculateStats();
         this.isLoading = false;
         this.cdr.detectChanges();
       },
@@ -170,6 +167,18 @@ export class StopPayments implements OnInit {
         this.showToast('⚠️ Could not connect to backend. Is the server running?');
         this.cdr.detectChanges();
       }
+    });
+  }
+
+  markDuplicates() {
+    const counts: { [key: string]: number } = {};
+    (this.allRecords || []).forEach(r => {
+      const key = `${r.accountNumber}_${r.serialNumber}`;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    (this.allRecords || []).forEach(r => {
+      const key = `${r.accountNumber}_${r.serialNumber}`;
+      r.isDuplicate = counts[key] > 1;
     });
   }
 
@@ -183,7 +192,7 @@ export class StopPayments implements OnInit {
     return {
       accountNumber: '', serialNumber: '', date: '', amount: 0, reason: '',
       beneficiaryName: '',
-      status: 'ACTIVE'
+      status: 'STOP'
     };
   }
 
@@ -191,7 +200,6 @@ export class StopPayments implements OnInit {
     this.selectedRecord = r;
     this.newRecord = { ...r };
     this.isFormEditable = false;
-    this.searchResult = null;
     this.showFormModal = true;
   }
 
@@ -221,18 +229,24 @@ export class StopPayments implements OnInit {
   }
 
   isFormValid(): boolean {
-    return (
-      this.newRecord.accountNumber.trim() !== '' &&
-      this.newRecord.serialNumber.trim() !== '' &&
-      this.newRecord.date.trim() !== '' &&
-      this.newRecord.beneficiaryName.trim() !== '' &&
-      this.newRecord.amount > 0 &&
-      this.newRecord.reason.trim() !== ''
+    const v = this.newRecord;
+    const isValid = !!(
+      v.accountNumber?.trim() &&
+      v.serialNumber?.trim() &&
+      v.date?.trim() &&
+      v.beneficiaryName?.trim() &&
+      v.amount > 0
     );
+    return isValid;
   }
 
   submitForm() {
-    if (!this.isFormValid()) return;
+    console.log('Submitting Stop Payment:', this.newRecord);
+    if (!this.isFormValid()) {
+      console.warn('Form validation failed:', this.newRecord);
+      this.showToast('⚠️ Please fill out all required fields correctly.');
+      return;
+    }
     this.isSaving = true;
     const now = new Date().toISOString();
 
@@ -249,6 +263,7 @@ export class StopPayments implements OnInit {
           if (idx > -1) this.allRecords[idx] = saved;
           this.selectedRecord = saved;
           this.newRecord = { ...saved };
+          this.markDuplicates();
           this.applyFilters();
           this.isFormEditable = false;
           this.isSaving = false;
@@ -258,8 +273,8 @@ export class StopPayments implements OnInit {
         },
         error: (err) => {
           this.isSaving = false;
-          console.error(err);
-          this.showToast('⚠️ Failed to update record.');
+          console.error('Update Error:', err);
+          this.showToast('⚠️ Failed to update record — Internal Server Error.');
           this.cdr.detectChanges();
         }
       });
@@ -270,22 +285,24 @@ export class StopPayments implements OnInit {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         createdBy: this.currentUser,
         createdTimestamp: now,
-        status: 'ACTIVE',
+        status: 'STOP',
       };
       this.http.post<StopPayment>(API, created).subscribe({
         next: (saved) => {
           this.allRecords.unshift(saved);
+          this.markDuplicates();
+          this.calculateStats();
           this.applyFilters();
           this.isFormEditable = false;
           this.isSaving = false;
           this.showFormModal = false;
-          this.showToast('New stop payment record created.');
+          this.showToast('New stop payment record created. Duplicate check applied.');
           this.cdr.detectChanges();
         },
         error: (err) => {
           this.isSaving = false;
-          console.error(err);
-          this.showToast('⚠️ Failed to create record.');
+          console.error('Create Error:', err);
+          this.showToast('⚠️ Failed to create record — API endpoint exception.');
           this.cdr.detectChanges();
         }
       });
@@ -299,7 +316,7 @@ export class StopPayments implements OnInit {
       next: () => {
         this.allRecords = this.allRecords.filter(x => x.id !== r.id);
         if (this.selectedRecord?.id === r.id) this.startNew();
-        if (this.searchResult?.id === r.id) this.searchResult = null;
+        this.calculateStats();
         this.applyFilters();
         this.showToast('Stop payment removed.');
         this.cdr.detectChanges();
@@ -314,9 +331,8 @@ export class StopPayments implements OnInit {
 
   getStatusClass(status?: string): string {
     switch ((status || '').toUpperCase()) {
-      case 'ACTIVE':   return 'status-active';
+      case 'STOP':     return 'status-stop';
       case 'RELEASED': return 'status-released';
-      case 'EXPIRED':  return 'status-expired';
       default:         return 'status-new';
     }
   }

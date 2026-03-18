@@ -402,10 +402,10 @@
   text-transform: uppercase;
 }
 
-.status-active   { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-.status-released { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
-.status-expired  { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.status-stop     { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; } /* Green */
+.status-released { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; } /* Grey */
 .status-new      { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.status-duplicate { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-weight: 700; padding: 0.15rem 0.5rem; font-size: 0.65rem; }
 
 /* ── Toast ───────────────────────────────────────────────── */
 .toast-message {
@@ -444,6 +444,47 @@
 @keyframes spin {
   0%   { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* ── Stats Header & Table ────────────────────────────────── */
+.stats-header-card {
+  border-left: 4px solid var(--navy-blue);
+  background: linear-gradient(to right, #ffffff, #f8fafc);
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.clickable-row:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+
+.stats-table thead th {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 0.8rem;
+  padding: 0.75rem 1rem;
+}
+
+.stats-table tbody td {
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+  color: var(--navy-blue-dark);
+}
+
+/* ── Stats Details Modal ── */
+.stats-details-modal {
+  max-width: 900px !important;
+  width: 90% !important;
+}
+
+.results-summary strong {
+  color: var(--navy-blue-dark);
+  margin-right: 0.5rem;
 }
 
 /* ── Responsive ──────────────────────────────────────────── */

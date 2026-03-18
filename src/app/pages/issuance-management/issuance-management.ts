@@ -41,6 +41,7 @@ interface IssuanceRecord {
   recordStatus?: string;
   previousStatus?: string;
   selected?: boolean;
+  isDuplicate?: boolean;
   historyList?: RecordHistoryEvent[];
 }
 
@@ -107,6 +108,7 @@ export class IssuanceManagement implements OnInit {
               }
             });
             this.allRecords = merged;
+            this.markDuplicates();
             this.isLoading = false;
             this.applyFilters();
             this.cdr.detectChanges();
@@ -114,6 +116,7 @@ export class IssuanceManagement implements OnInit {
           error: () => {
             // Orphaned fetch failed — still show the file-linked records
             this.allRecords = merged;
+            this.markDuplicates();
             this.isLoading = false;
             this.applyFilters();
             this.cdr.detectChanges();
@@ -129,12 +132,30 @@ export class IssuanceManagement implements OnInit {
     });
   }
 
-  /** Persist a single record update to the backend. */
-  private saveRecord(record: IssuanceRecord) {
-    if (!record.id) return;
-    this.http.put(`${API}/records/${record.id}`, record).subscribe({
-      error: (err) => console.error('Failed to save record:', err)
+  markDuplicates() {
+    const counts: { [key: string]: number } = {};
+    (this.allRecords || []).forEach(r => {
+      const key = `${r.accountNumber}_${r.serialNumber}`;
+      counts[key] = (counts[key] || 0) + 1;
     });
+    (this.allRecords || []).forEach(r => {
+      const key = `${r.accountNumber}_${r.serialNumber}`;
+      r.isDuplicate = counts[key] > 1;
+    });
+  }
+
+  /** Persist a single record update to the backend. */
+  private saveRecord(record: IssuanceRecord, isNew: boolean = false) {
+    if (!record.id) return;
+    if (isNew) {
+      this.http.post(`${API}/records`, record).subscribe({
+        error: (err) => console.error('Failed to create record:', err)
+      });
+    } else {
+      this.http.put(`${API}/records/${record.id}`, record).subscribe({
+        error: (err) => console.error('Failed to save record:', err)
+      });
+    }
   }
 
   /** Physically delete a single record in the backend. */
@@ -344,11 +365,14 @@ export class IssuanceManagement implements OnInit {
         if (line) {
           const parts = line.split(',');
           if (parts.length >= 5) {
+            const serialNumber = parts[1]?.trim() || '';
+            const accountNumber = parts[2]?.trim() || '';
+            
             newRecords.push({
               id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
               date: parts[0]?.trim() || '',
-              serialNumber: parts[1]?.trim() || '',
-              accountNumber: parts[2]?.trim() || '',
+              serialNumber: serialNumber,
+              accountNumber: accountNumber,
               beneficiaryName: parts[3]?.trim() || '',
               amount: parseFloat(parts[4]) || 0,
               createdBy: this.currentUser,
@@ -379,17 +403,18 @@ export class IssuanceManagement implements OnInit {
         this.http.post<any>(`${API}/files`, newFile).subscribe({
           next: () => {
             this.allRecords = [...newRecords, ...this.allRecords];
+            this.markDuplicates(); // Mark duplicates after adding new records
             this.historicalFiles.unshift(newFile);
             if (this.historicalFiles.length > 10) {
               this.historicalFiles.pop();
             }
             this.activeHistoryId = newFile.id;
             this.applyFilters();
-            this.showToast(`Imported ${newRecords.length} records successfully.`);
+            this.showToast(`Imported ${newRecords.length} records. Unique checks applied for visibility.`);
           },
           error: (err) => {
             console.error('Failed to save file to API:', err);
-            this.showToast('⚠️ Upload failed — backend unreachable.');
+            this.showToast('⚠️ Upload failed — Backend service exception. High priority.');
           }
         });
       }
@@ -501,7 +526,7 @@ export class IssuanceManagement implements OnInit {
 
     const csvLines = this.filteredRecords.map(r => {
       return [
-        r.date, r.serialNumber, r.accountNumber, r.beneficiary, r.amount,
+        r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.amount,
         r.createdBy || '', r.createdTimestamp || '', r.modifiedBy || '',
         r.modifiedTimestamp || '', r.approvedBy || '', r.approvedTimestamp || '',
         r.modifiedCount || 0, r.recordStatus || ''
@@ -904,7 +929,8 @@ export class IssuanceManagement implements OnInit {
 
           Object.assign(this.allRecords[index], this.newRecord);
           this.selectedRecord = this.allRecords[index];
-          this.saveRecord(this.allRecords[index]);
+          this.markDuplicates();
+          this.saveRecord(this.allRecords[index], false);
           this.showFormModal = false;
         }
       } else {
@@ -914,12 +940,10 @@ export class IssuanceManagement implements OnInit {
         if (!this.newRecord.historyList) this.newRecord.historyList = [];
         const created = { ...this.newRecord };
         this.allRecords.unshift(created);
-        // New manually-created record has no file — persist via a standalone record insert
-        // We reuse saveRecord which calls PUT; for a brand new record we need POST-like
-        // The backend PUT will upsert because the record may not yet exist.
-        // Instead, we piggyback by posting it as a file with no fileId.
-        this.saveRecord(created);
+        this.markDuplicates();
+        this.saveRecord(created, true);
         this.showFormModal = false;
+        this.showToast('Record saved. Duplicate status updated if applicable.');
       }
       this.applyFilters();
       this.isFormEditable = false;
