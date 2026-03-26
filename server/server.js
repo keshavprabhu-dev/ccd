@@ -3,10 +3,11 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const { parseX9Buffer } = require('./x9-parser');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
 
 // Ensure db directory exists
 const dbDir = path.join(__dirname, 'db');
@@ -30,6 +31,17 @@ issuanceDb.serialize(() => {
       fileName TEXT,
       uploadDate TEXT,
       fileStatus TEXT
+    )
+  `);
+
+  issuanceDb.run(`
+    CREATE TABLE IF NOT EXISTS icl_files (
+      id TEXT PRIMARY KEY,
+      fileName TEXT,
+      uploadDate TEXT,
+      fileType TEXT,
+      totalCount INTEGER,
+      totalAmount REAL
     )
   `);
 
@@ -310,6 +322,60 @@ app.delete('/api/stop-payments/:id', (req, res) => {
     res.json({ success: true });
   });
 });
+
+// ── ICL Parser Endpoint ───────────────────────────────────────────────────
+const iclUploadDir = path.join(__dirname, 'uploads', 'icl');
+if (!fs.existsSync(iclUploadDir)) {
+  fs.mkdirSync(iclUploadDir, { recursive: true });
+}
+app.use('/api/images/icl', express.static(iclUploadDir));
+
+app.post('/api/icl-parser/upload', async (req, res) => {
+  const { fileName, fileContent } = req.body;
+  if (!fileName || !fileContent) {
+    return res.status(400).json({ error: 'Missing fileName or fileContent' });
+  }
+
+  const filePath = path.join(iclUploadDir, fileName);
+  // if (fs.existsSync(filePath)) {
+  //   return res.status(409).json({ error: 'Duplicate - File already Processed' });
+  // }
+
+  try {
+    const buffer = Buffer.from(fileContent, 'base64');
+    fs.writeFileSync(filePath, buffer);
+    
+    // Parse the file and extract summary/checks/images
+    const uniquePrefix = fileName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const parsedData = await parseX9Buffer(buffer, iclUploadDir, uniquePrefix);
+    
+    // Save to historical table
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+    const uploadDate = new Date().toISOString();
+    
+    issuanceDb.run(
+      'INSERT INTO icl_files (id, fileName, uploadDate, fileType, totalCount, totalAmount) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, fileName, uploadDate, parsedData.versionString, parsedData.summary.count, parsedData.summary.totalAmount],
+      (err) => {
+        if (err) console.error('Error saving ICL history:', err);
+      }
+    );
+
+    res.status(200).json({ message: 'File successfully parsed!', parsedData });
+  } catch (error) {
+    console.error('File saving/parsing error:', error);
+    res.status(500).json({ error: 'Internal server error while saving file' });
+  }
+});
+
+app.get('/api/icl-parser/files', (req, res) => {
+  issuanceDb.all('SELECT * FROM icl_files ORDER BY uploadDate DESC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+
 
 const PORT = 3000;
 app.listen(PORT, () => {

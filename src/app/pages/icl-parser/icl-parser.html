@@ -1,0 +1,279 @@
+<div class="icl-page">
+
+  <!-- ══ Page Header ═══════════════════════════════════════════════════════ -->
+  <div class="icl-page-header">
+    <div class="icl-page-header-left">
+      <div class="icl-page-icon">
+        <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      </div>
+      <div>
+        <h1 class="icl-page-title">ICL File Parser</h1>
+        <p class="icl-page-subtitle">Upload, parse and inspect X9.37 / X9.100 Image Cash Letter files</p>
+      </div>
+    </div>
+    <div class="icl-stats-row" *ngIf="fileHistory.length > 0">
+      <div class="icl-stat-pill">
+        <span class="icl-stat-label">Files Processed</span>
+        <span class="icl-stat-value">{{ fileHistory.length }}</span>
+      </div>
+      <div class="icl-stat-pill">
+        <span class="icl-stat-label">Total Checks</span>
+        <span class="icl-stat-value">{{ fileHistory | sum:'totalCount' }}</span>
+      </div>
+      <div class="icl-stat-pill">
+        <span class="icl-stat-label">Total Amount</span>
+        <span class="icl-stat-value">{{ fileHistory | sum:'totalAmount' | currency }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Upload Card ════════════════════════════════════════════════════════ -->
+  <div class="icl-card upload-card">
+    <div class="icl-card-header">
+      <h2 class="icl-card-title">Upload ICL File</h2>
+      <span class="icl-card-badge">Supports X9.37 &amp; X9.100-187</span>
+    </div>
+
+    <div class="drop-zone" [class.drag-over]="isDragOver" [class.has-file]="!!selectedFile"
+         (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)"
+         (drop)="onDrop($event)" (click)="fileInput.click()">
+      <input #fileInput type="file" id="icl-file" (change)="onFileSelected($event)" accept=".x9,.icl,.txt,.csv" class="hidden-input">
+
+      <div class="drop-zone-inner" *ngIf="!selectedFile">
+        <div class="drop-icon">
+          <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        </div>
+        <p class="drop-title">Drag &amp; drop your ICL file here</p>
+        <p class="drop-subtitle">or <span class="drop-link">click to browse</span> &nbsp;·&nbsp; .x9 and .icl files accepted</p>
+      </div>
+
+      <div class="drop-zone-inner selected-state" *ngIf="selectedFile">
+        <div class="file-selected-icon">
+          <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <p class="file-selected-name">{{ selectedFile.name }}</p>
+        <p class="file-selected-size">{{ (selectedFile.size / 1024).toFixed(1) }} KB &nbsp;·&nbsp; Ready to parse</p>
+      </div>
+    </div>
+
+    <div class="upload-actions">
+      <button *ngIf="selectedFile" type="button" class="btn-ghost" (click)="clearFile(); $event.stopPropagation()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        Clear
+      </button>
+      <button type="button" class="btn-primary-icl" [disabled]="!selectedFile || isUploading" (click)="uploadFile()">
+        <span class="spinner" *ngIf="isUploading"></span>
+        <svg *ngIf="!isUploading" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        {{ isUploading ? 'Parsing File...' : 'Parse File' }}
+      </button>
+    </div>
+
+    <div class="alert-banner" [class.alert-error]="isError" [class.alert-success]="!isError" *ngIf="message">
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path *ngIf="isError" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        <path *ngIf="!isError" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      {{ message }}
+    </div>
+  </div>
+
+  <!-- ══ File Summary ═══════════════════════════════════════════════════════ -->
+  <div class="icl-card" *ngIf="parsedData">
+    <div class="icl-card-header">
+      <h2 class="icl-card-title">File Summary</h2>
+      <span class="version-badge">{{ parsedData.versionString }}</span>
+    </div>
+    <div class="summary-stats">
+      <div class="summary-stat">
+        <div class="summary-stat-icon checks-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        </div>
+        <div>
+          <div class="summary-stat-value">{{ parsedData.summary.count }}</div>
+          <div class="summary-stat-label">Total Checks</div>
+        </div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-stat-icon amount-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div>
+          <div class="summary-stat-value">{{ parsedData.summary.totalAmount | currency }}</div>
+          <div class="summary-stat-label">Batch Total Amount</div>
+        </div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-stat-icon image-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        </div>
+        <div>
+          <div class="summary-stat-value">{{ parsedData.checks | countImages }}</div>
+          <div class="summary-stat-label">Check Images</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Check Details Table ════════════════════════════════════════════════ -->
+  <div class="icl-card" *ngIf="parsedData">
+    <div class="icl-card-header">
+      <h2 class="icl-card-title">Check Details</h2>
+      <span class="record-count-badge">{{ filteredChecks.length }} of {{ parsedData.checks.length }} records</span>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <div class="filter-group search-group">
+        <svg class="filter-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input class="filter-input" [(ngModel)]="filterText" placeholder="Search routing, account, payee, serial…" />
+      </div>
+      <div class="filter-group">
+        <svg class="filter-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <input class="filter-input date-input" type="date" [(ngModel)]="filterDate" title="Filter by check date" />
+      </div>
+      <div class="filter-group amount-group">
+        <span class="amount-label">$</span>
+        <input class="filter-input amount-input" type="number" [(ngModel)]="filterMinAmount" placeholder="Min amount" />
+        <span class="amount-sep">–</span>
+        <input class="filter-input amount-input" type="number" [(ngModel)]="filterMaxAmount" placeholder="Max amount" />
+      </div>
+      <button class="btn-clear-filter" (click)="clearFilters()" *ngIf="filterText || filterDate || filterMinAmount || filterMaxAmount" title="Clear filters">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        Clear
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrapper">
+      <table class="icl-table">
+        <thead>
+          <tr>
+            <th class="col-num">#</th>
+            <th>Check Date</th>
+            <th>Serial Number</th>
+            <th>Routing Number</th>
+            <th>Account Number</th>
+            <th>Payee Name</th>
+            <th class="col-amount">Amount</th>
+            <th class="col-images">Images</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let check of filteredChecks; let i = index" class="table-row">
+            <td class="col-num">{{ i + 1 }}</td>
+            <td>
+              <span class="date-chip" *ngIf="check.checkDate">{{ check.checkDate }}</span>
+              <span class="na-text" *ngIf="!check.checkDate">—</span>
+            </td>
+            <td><span class="mono">{{ check.serialNumber || '—' }}</span></td>
+            <td><span class="mono routing">{{ check.routingNumber || '—' }}</span></td>
+            <td><span class="mono">{{ check.accountNumber || '—' }}</span></td>
+            <td>{{ check.payeeName || '—' }}</td>
+            <td class="col-amount"><span class="amount-val">{{ check.amount | currency }}</span></td>
+            <td class="col-images">
+              <button class="view-images-btn" *ngIf="check.images?.length > 0" (click)="openLightbox(check, i + 1)" title="View {{ check.images.length }} image(s)">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                {{ check.images.length }} image{{ check.images.length > 1 ? 's' : '' }}
+              </button>
+              <span class="na-text" *ngIf="!check.images?.length">—</span>
+            </td>
+          </tr>
+          <tr *ngIf="filteredChecks.length === 0">
+            <td colspan="8" class="empty-row">No records match your filters.</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="totals-row">
+            <td colspan="6" class="totals-label">Showing {{ filteredChecks.length }} check(s)</td>
+            <td class="col-amount totals-amount">
+              {{ (filteredChecks | sumField:'amount') | currency }}
+            </td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ History Table ══════════════════════════════════════════════════════ -->
+  <div class="icl-card" *ngIf="fileHistory.length > 0">
+    <div class="icl-card-header">
+      <h2 class="icl-card-title">Parsed File History</h2>
+      <span class="record-count-badge">{{ fileHistory.length }} files</span>
+    </div>
+    <div class="table-wrapper">
+      <table class="icl-table">
+        <thead>
+          <tr>
+            <th>Upload Date &amp; Time</th>
+            <th>File Name</th>
+            <th>ICL Format</th>
+            <th class="col-amount">Check Count</th>
+            <th class="col-amount">Batch Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let record of fileHistory" class="table-row">
+            <td>{{ record.uploadDate | date:'MMM d, y, h:mm a' }}</td>
+            <td>
+              <div class="file-name-cell">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                {{ record.fileName }}
+              </div>
+            </td>
+            <td><span class="format-badge">{{ record.fileType }}</span></td>
+            <td class="col-amount">{{ record.totalCount }}</td>
+            <td class="col-amount amount-val">{{ record.totalAmount | currency }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ Image Lightbox Overlay ══════════════════════════════════════════════ -->
+<div class="lightbox-overlay" *ngIf="lightboxOpen" (click)="closeLightbox()">
+  <div class="lightbox-panel" (click)="$event.stopPropagation()">
+    <div class="lightbox-header">
+      <div class="lightbox-title">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Check #{{ lightboxCheckNum }} Images
+        <span class="lightbox-side-pill" [class.back-pill]="lightboxImages[lightboxIndex]?.side === 'back'">
+          {{ lightboxImages[lightboxIndex]?.side === 'back' ? 'Back' : 'Front' }}
+        </span>
+      </div>
+      <button class="lightbox-close" (click)="closeLightbox()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="lightbox-image-area">
+      <button class="lightbox-nav prev-btn" (click)="prevImage()" [disabled]="lightboxIndex === 0">
+        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <div class="lightbox-img-container">
+        <img [src]="lightboxImages[lightboxIndex]?.url" alt="Check image" class="lightbox-img" />
+      </div>
+      <button class="lightbox-nav next-btn" (click)="nextImage()" [disabled]="lightboxIndex === lightboxImages.length - 1">
+        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+
+    <div class="lightbox-footer">
+      <div class="lightbox-thumbnails">
+        <button *ngFor="let img of lightboxImages; let ti = index"
+                class="thumb-btn" [class.thumb-active]="ti === lightboxIndex"
+                (click)="lightboxIndex = ti">
+          <img [src]="img.url" alt="thumb" class="thumb-img" />
+          <span class="thumb-label" [class.back-label]="img.side === 'back'">{{ img.side }}</span>
+        </button>
+      </div>
+      <div class="lightbox-page-info">
+        {{ lightboxIndex + 1 }} / {{ lightboxImages.length }}
+        &nbsp;·&nbsp;
+        <a [href]="lightboxImages[lightboxIndex]?.url" target="_blank" class="open-link">Open full size ↗</a>
+      </div>
+    </div>
+  </div>
+</div>
