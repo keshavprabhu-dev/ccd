@@ -375,6 +375,23 @@ app.get('/api/icl-parser/files', (req, res) => {
   });
 });
 
+app.get('/api/icl-parser/files/:fileName', async (req, res) => {
+  const fileName = decodeURIComponent(req.params.fileName);
+  const filePath = path.join(iclUploadDir, fileName);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'File not found on disk' });
+  }
+  try {
+    const buffer = fs.readFileSync(filePath);
+    const uniquePrefix = fileName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const parsedData = await parseX9Buffer(buffer, iclUploadDir, uniquePrefix);
+    res.status(200).json({ parsedData });
+  } catch (error) {
+    console.error('File parsing error from history:', error);
+    res.status(500).json({ error: 'Internal server error while parsing historical file' });
+  }
+});
+
 
 
 const PORT = 3000;

@@ -1,0 +1,54 @@
+﻿Cleared ICL files from database.
+Cleared uploads directory.
+
+
+--- Parsing file: Test ICL with 10 checks.x9 ---
+Version: X9.37-2003 (DSTU)
+Total Checks: 10
+Batch Amount: $1000.9
+Check 1 Details:
+  Amount: 100
+  Routing: 057770930
+  Account: 209 153 53
+  Serial: 111
+  Date: null
+  RAW Rec25: 25                057770930      209 153 53/111000001000044000000       G01Y020A
+
+
+--- Parsing file: Test ICLR with 10 checks.x9 ---
+Version: X9.37-2003 (DSTU)
+Total Checks: 10
+Batch Amount: $1000.9
+Check 1 Details:
+  Amount: 100
+  Routing: 057770930
+  Account: 209 153 53/111
+  Serial: 
+  Date: null
+  RAW Rec25: 31057770930      209 153 53/1110000010000A03G2022030544000000        1B         
+
+
+--- Parsing file: x9.100-180-2006.x9 ---
+Version: X9.100-187 (Level 20)
+Total Checks: 10
+Batch Amount: $1000.9
+Check 1 Details:
+  Amount: 100
+  Routing: 057770930
+  Account: 209 153 53
+  Serial: 111
+  Date: null
+  RAW Rec25: 25                057770930      209 153 53/111000001000044000000       G01Y020A
+
+
+--- Parsing file: x937 dstu.x9 ---
+Version: X9.37-2003 (DSTU)
+Total Checks: 10
+Batch Amount: $1000.9
+Check 1 Details:
+  Amount: 100
+  Routing: 057770930
+  Account: 209 153 53
+  Serial: 111
+  Date: null
+  RAW Rec25: 25                057770930      209 153 53/111000001000044000000       G01Y020A

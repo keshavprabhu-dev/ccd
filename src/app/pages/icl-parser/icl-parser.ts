@@ -137,9 +137,36 @@ export class IclParser implements OnInit {
   }
 
   // ── Lightbox ─────────────────────────────────────────────────────────────
+  selectedCheck: any = null;
+
+  viewHistoricalFile(record: any) {
+    this.isUploading = true;
+    this.message = '';
+    this.isError = false;
+    this.parsedData = null;
+    this.clearFile();
+
+    this.http.get(`http://localhost:3000/api/icl-parser/files/${encodeURIComponent(record.fileName)}`).subscribe({
+      next: (response: any) => {
+        this.isUploading = false;
+        this.isError = false;
+        this.message = `✓ Successfully loaded historical file: "${record.fileName}"`;
+        this.parsedData = response.parsedData;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.isUploading = false;
+        this.isError = true;
+        this.message = err.status === 404 ? 'Original file no longer exists on server.' : 'Could not parse historical file.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
   openLightbox(check: any, checkNum: number) {
-    if (!check.images?.length) return;
-    this.lightboxImages = check.images;
+    this.selectedCheck = check;
+    this.lightboxImages = check.images || [];
     this.lightboxIndex = 0;
     this.lightboxCheckNum = checkNum;
     this.lightboxOpen = true;

@@ -68,52 +68,44 @@ async function parseX9Buffer(buffer, uploadDir, uniquePrefix) {
         : `X9.100-187 (Level ${standardLevel})`;
     }
 
-    // ── Check Detail (Type 25) ─────────────────────────────────────────────
-    else if (recordType === '25') {
+    // ── Check Detail (Type 25) or Return (Type 31) ─────────────────────────
+    else if (recordType === '25' || recordType === '31') {
       const str = decodeEbcdic(recordBuf);
-
-      /*
-       * X9.37-2003 Type 25 layout (fixed 80 bytes):
-       *  [0-1]   Record type          "25"
-       *  [2]     Auxiliary on-us      1 char
-       *  [3-11]  Routing number       9 chars
-       *  [12-27] On-us / account      16 chars
-       *  [28-34] Item seq number      7 chars
-       *  [35-40] Check date           6 chars (YYMMDD) or blank
-       *  [41-49] Amount               10 chars
-       *  ...
-       *
-       * X9.100-187 Type 25 layout (variable, typically 80+):
-       *  [0-1]   Record type          "25"
-       *  [2-10]  Paying bank rt       9 chars
-       *  [11]    Auxiliary on-us      1 char
-       *  [12-26] On-us field          15 chars
-       *  [27-41] Item amount          15 chars (includes 2 decimal)
-       *  [42-49] Client data          8 chars
-       *  [50-57] Item seq number      8 chars
-       *  [58-65] Check date           8 chars (YYYYMMDD)
-       *  ...
-       * 
-       * We'll use heuristics: scan for numeric-only amount field
-       */
 
       let amountStr = '', routingNumber = '', accountNumber = '';
       let serialNumber = '', checkDate = '', payeeName = '';
 
-      if (recordLength <= 80) {
-        // X9.37-2003
+      if (recordType === '31') {
         routingNumber  = str.substring(2, 11).trim();
-        accountNumber  = str.substring(11, 27).trim();
-        serialNumber   = str.substring(27, 34).trim();
-        checkDate      = ''; // embedded in addendum (Type 26)
-        amountStr      = str.substring(34, 44).trim();
+        accountNumber  = str.substring(11, 31).trim();
+        amountStr      = str.substring(31, 41).trim();
+        serialNumber   = '';
       } else {
-        // X9.100-187
-        routingNumber  = str.substring(2, 11).trim();
-        accountNumber  = str.substring(11, 26).trim();
-        amountStr      = str.substring(26, 41).trim();
-        serialNumber   = str.substring(50, 58).trim();
-        checkDate      = formatDate(str.substring(58, 66));
+        // Record 25
+        if (recordLength <= 80) {
+          // Fixed 80-byte DSTU / X9.100-187 format 25 record
+          routingNumber  = str.substring(18, 27).trim();
+          
+          const onUs = str.substring(27, 47).trim(); // On-Us field is 20 chars
+          if (onUs.includes('/')) {
+            const parts = onUs.split('/');
+            accountNumber = parts[0].trim();
+            serialNumber = parts[1].trim();
+          } else {
+            accountNumber = onUs;
+            serialNumber = str.substring(57, 72).trim(); // Item seq num 15 chars fallback
+          }
+
+          amountStr      = str.substring(47, 57).trim();
+          checkDate      = ''; 
+        } else {
+          // Variable-length X9.100-187 heuristical
+          routingNumber  = str.substring(2, 11).trim();
+          accountNumber  = str.substring(11, 26).trim();
+          amountStr      = str.substring(26, 41).trim();
+          serialNumber   = str.substring(50, 58).trim();
+          checkDate      = formatDate(str.substring(58, 66));
+        }
       }
 
       const amount = parseInt(amountStr.replace(/\D/g, ''), 10) / 100 || 0;
@@ -123,10 +115,11 @@ async function parseX9Buffer(buffer, uploadDir, uniquePrefix) {
       currentCheck = {
         amount:        parseFloat(amount.toFixed(2)),
         routingNumber: routingNumber.replace(/[^0-9]/g, ''),
-        accountNumber: accountNumber.replace(/[^0-9A-Za-z\-]/g, '').trim(),
+        accountNumber: accountNumber.replace(/[^0-9A-Za-z\-/ ]/g, '').trim(),
         serialNumber:  serialNumber.replace(/[^0-9A-Za-z]/g, '').trim(),
         checkDate:     checkDate || null,
         payeeName:     '', // filled by Type 26 addendum
+        rawRecord25:   str,
         images:        [],
         imageSide:     []
       };

@@ -1,0 +1,23 @@
+﻿[33mΓ¥»[39m Building...
+[32mΓ£ö[39m Building...
+[1mInitial chunk files[22m[2m | [22m[1mNames[22m              [2m | [22m [1mRaw size[22m[2m | [22m[1mEstimated transfer size[22m
+[32mchunk-SYNABECJ.js[39m  [2m | [22m[2m-[22m                  [2m | [22m[36m143.07 kB[39m[2m | [22m               [36m42.02 kB[39m
+[32mchunk-AJAPVWB6.js[39m  [2m | [22m[2m-[22m                  [2m | [22m [36m98.43 kB[39m[2m | [22m               [36m24.75 kB[39m
+[32mchunk-SWI27MFR.js[39m  [2m | [22m[2m-[22m                  [2m | [22m [36m91.00 kB[39m[2m | [22m               [36m21.79 kB[39m
+[32mmain-7COS4RJW.js[39m   [2m | [22m[2mmain[22m               [2m | [22m[36m839 bytes[39m[2m | [22m              [36m839 bytes[39m
+[32mstyles-HU2WO3XS.css[39m[2m | [22m[2mstyles[22m             [2m | [22m[36m559 bytes[39m[2m | [22m              [36m559 bytes[39m
+
+[1m [22m                  [2m | [22m[1mInitial total[22m      [2m | [22m[1m333.90 kB[22m[2m | [22m               [1m89.95 kB[22m
+
+[1mLazy chunk files[22m   [2m | [22m[1mNames[22m              [2m | [22m [1mRaw size[22m[2m | [22m[1mEstimated transfer size[22m
+[32mchunk-VAAC4DQB.js[39m  [2m | [22m[2missuance-management[22m[2m | [22m [36m62.39 kB[39m[2m | [22m               [36m12.33 kB[39m
+[32mchunk-5O6YUPJL.js[39m  [2m | [22m[2micl-parser[22m         [2m | [22m [36m52.61 kB[39m[2m | [22m                [36m9.31 kB[39m
+[32mchunk-YXGRGZFP.js[39m  [2m | [22m[2mstop-payments[22m      [2m | [22m [36m38.49 kB[39m[2m | [22m                [36m8.38 kB[39m
+[32mchunk-3XITXEWN.js[39m  [2m | [22m[2madministration[22m     [2m | [22m [36m15.17 kB[39m[2m | [22m                [36m4.30 kB[39m
+[32mchunk-2OGTPEDA.js[39m  [2m | [22m[2mdashboard[22m          [2m | [22m[36m618 bytes[39m[2m | [22m              [36m618 bytes[39m
+[32mchunk-VKUZ5DHL.js[39m  [2m | [22m[2mcheck-processing[22m   [2m | [22m[36m437 bytes[39m[2m | [22m              [36m437 bytes[39m
+
+Application bundle generation complete. [2.687 seconds] - 2026-03-26T05:34:41.026Z
+
+Output location: D:\codex_workspace\ccd\dist\ccd-app
+
