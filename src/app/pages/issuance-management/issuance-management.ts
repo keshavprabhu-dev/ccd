@@ -3,8 +3,9 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { App } from '../../app';
+import { environment } from '../../../environments/environment';
 
-const API = 'http://localhost:3000/api/issuance';
+const API = `${environment.apiUrl}/issuance`;
 
 interface RecordHistoryEvent {
   timestamp: string;

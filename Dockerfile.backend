@@ -1,0 +1,11 @@
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY server ./server
+
+# Ensure directories for sqlite and uploads exist
+RUN mkdir -p server/db server/uploads
+
+EXPOSE 3000
+CMD ["node", "server/server.js"]

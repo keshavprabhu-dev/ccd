@@ -3,6 +3,7 @@ import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { SumPipe, SumFieldPipe, CountImagesPipe } from './icl-pipes';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-icl-parser',
@@ -59,7 +60,7 @@ export class IclParser implements OnInit {
   }
 
   loadHistory() {
-    this.http.get('http://localhost:3000/api/icl-parser/files').subscribe({
+    this.http.get(`${environment.apiUrl}/icl-parser/files`).subscribe({
       next: (data: any) => { this.fileHistory = data; this.cdr.detectChanges(); },
       error: (err) => console.error('Error loading history:', err)
     });
@@ -104,7 +105,7 @@ export class IclParser implements OnInit {
       let base64Content = reader.result as string;
       if (base64Content.includes(',')) base64Content = base64Content.split(',')[1];
 
-      this.http.post('http://localhost:3000/api/icl-parser/upload', {
+      this.http.post(`${environment.apiUrl}/icl-parser/upload`, {
         fileName: this.selectedFile!.name,
         fileContent: base64Content
       }).subscribe({
@@ -146,7 +147,7 @@ export class IclParser implements OnInit {
     this.parsedData = null;
     this.clearFile();
 
-    this.http.get(`http://localhost:3000/api/icl-parser/files/${encodeURIComponent(record.fileName)}`).subscribe({
+    this.http.get(`${environment.apiUrl}/icl-parser/files/${encodeURIComponent(record.fileName)}`).subscribe({
       next: (response: any) => {
         this.isUploading = false;
         this.isError = false;
@@ -159,6 +160,27 @@ export class IclParser implements OnInit {
         this.isUploading = false;
         this.isError = true;
         this.message = err.status === 404 ? 'Original file no longer exists on server.' : 'Could not parse historical file.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  deleteHistoricalFile(record: any) {
+    if (!confirm(`Are you sure you want to permanently delete "${record.fileName}" and its extracted images?`)) return;
+    this.http.delete(`${environment.apiUrl}/icl-parser/files/${record.id}`).subscribe({
+      next: () => {
+        this.message = `✓ Successfully deleted "${record.fileName}"`;
+        this.isError = false;
+        if (this.parsedData?.fileName === record.fileName || (this.selectedFile && this.selectedFile.name === record.fileName)) {
+            // clear active parsed screen if we are viewing it
+            this.parsedData = null;
+        }
+        this.loadHistory();
+      },
+      error: (err) => {
+        console.error('Delete error:', err);
+        this.message = `Failed to delete "${record.fileName}"`;
+        this.isError = true;
         this.cdr.detectChanges();
       }
     });

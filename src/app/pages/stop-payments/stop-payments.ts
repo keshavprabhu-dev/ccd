@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { App } from '../../app';
+import { environment } from '../../../environments/environment';
 
-const API = 'http://localhost:3000/api/stop-payments';
+const API = `${environment.apiUrl}/stop-payments`;
 
 interface StopPayment {
   id?: string;

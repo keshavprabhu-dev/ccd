@@ -1,13 +1,26 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 const { parseX9Buffer } = require('./x9-parser');
 
 const app = express();
+app.use(helmet({ crossOriginResourcePolicy: false })); // Allowed for static images locally
 app.use(cors());
-app.use(express.json({ limit: '100mb' }));
+
+// Basic rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // limit each IP to 200 requests per windowMs
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes' }
+});
+app.use('/api/', apiLimiter);
+
+// Fixed JSON payload limit (10mb replaces 100mb)
+app.use(express.json({ limit: '10mb' }));
 
 // Ensure db directory exists
 const dbDir = path.join(__dirname, 'db');
@@ -392,9 +405,33 @@ app.get('/api/icl-parser/files/:fileName', async (req, res) => {
   }
 });
 
+app.delete('/api/icl-parser/files/:id', (req, res) => {
+  const id = req.params.id;
+  issuanceDb.get('SELECT fileName FROM icl_files WHERE id = ?', [id], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'File not found' });
+    
+    // Delete file from disk
+    const filePath = path.join(iclUploadDir, row.fileName);
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        console.error('Failed to delete file from disk:', e);
+      }
+    }
+    
+    // Delete record from DB
+    issuanceDb.run('DELETE FROM icl_files WHERE id = ?', [id], (deleteErr) => {
+      if (deleteErr) return res.status(500).json({ error: deleteErr.message });
+      res.json({ success: true });
+    });
+  });
+});
 
 
-const PORT = 3000;
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server is running cleanly on http://localhost:${PORT}`);
+  console.log(`Server is running cleanly on port ${PORT}`);
 });

@@ -142,13 +142,16 @@ async function parseX9Buffer(buffer, uploadDir, uniquePrefix) {
       }
     }
 
-    // ── Image View Data (Type 50) – front=1, back=2 ───────────────────────
+    // ── Image View Data (Type 50) – front/back toggle ───────────────────────
     else if (recordType === '50') {
       if (currentCheck) {
-        const str = decodeEbcdic(recordBuf.slice(0, 20));
-        // Side indicator at position 2: '1' = front, '2' = back
-        const side = str.substring(2, 3).trim();
-        currentCheck._nextImageSide = side === '2' ? 'back' : 'front';
+        // Automatically toggle image side: first image is front, second is back.
+        // This is highly robust across DSTU, X9.100-180, and X9.100-187 variants where position offsets change.
+        if (!currentCheck._nextImageSide || currentCheck._nextImageSide === 'back') {
+          currentCheck._nextImageSide = 'front';
+        } else {
+          currentCheck._nextImageSide = 'back';
+        }
       }
     }
 
