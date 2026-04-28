@@ -683,7 +683,7 @@
   background: #0f172a;
   border-radius: 20px;
   width: 100%;
-  max-width: 900px;
+  max-width: 1200px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -784,20 +784,74 @@
 .lightbox-img-container {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 360px;
-  max-height: 480px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-height: 450px;
+  max-height: 70vh;
   background: #1e293b;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: auto;
+  position: relative;
 }
 
 .lightbox-img {
-  max-width: 100%;
-  max-height: 460px;
+  max-width: none;
+  max-height: none;
+  height: auto;
   object-fit: contain;
   border-radius: 8px;
+  margin: auto;
+  transition: width 0.2s ease-out;
+}
+
+.zoom-controls {
+  position: sticky;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 4px;
+  gap: 4px;
+  z-index: 10;
+  margin-bottom: -40px; /* prevent it from pushing the image down */
+}
+
+.zoom-btn {
+  background: transparent;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.zoom-btn:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+.zoom-label {
+  background: transparent;
+  color: white;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 8px;
+  cursor: pointer;
+  min-width: 48px;
+}
+
+.zoom-label:hover {
+  color: #3b82f6;
 }
 
 .lightbox-footer {
@@ -883,29 +937,30 @@
 
 /* Update lightbox panel limits */
 .lightbox-panel.details-panel {
-  max-width: 1000px;
+  max-width: 1400px;
+  max-height: 95vh;
 }
 
 .lightbox-body {
   display: flex;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  flex-direction: column;
 }
 
 .lightbox-images-section {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  border-right: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
 .lightbox-details-section {
-  width: 380px;
+  width: 100%;
   flex-shrink: 0;
   padding: 1.5rem;
-  overflow-y: auto;
   background: rgba(255,255,255,0.02);
 }
 
@@ -940,9 +995,9 @@
 }
 
 .details-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.25rem;
 }
 
 .detail-item {

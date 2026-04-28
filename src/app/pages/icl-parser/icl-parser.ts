@@ -38,6 +38,7 @@ export class IclParser implements OnInit {
   lightboxImages: { url: string; side: string }[] = [];
   lightboxIndex = 0;
   lightboxCheckNum = 0;
+  imageZoom = 1;
 
   get filteredChecks(): any[] {
     if (!this.parsedData?.checks) return [];
@@ -201,6 +202,7 @@ export class IclParser implements OnInit {
     this.selectedCheck = check;
     this.lightboxImages = check.images || [];
     this.lightboxIndex = 0;
+    this.imageZoom = 1;
     this.lightboxCheckNum = checkNum;
     this.lightboxOpen = true;
     document.body.style.overflow = 'hidden';
@@ -208,15 +210,34 @@ export class IclParser implements OnInit {
 
   closeLightbox() {
     this.lightboxOpen = false;
+    this.imageZoom = 1;
     document.body.style.overflow = '';
   }
 
   prevImage() {
-    if (this.lightboxIndex > 0) this.lightboxIndex--;
+    if (this.lightboxIndex > 0) {
+      this.lightboxIndex--;
+      this.imageZoom = 1;
+    }
   }
 
   nextImage() {
-    if (this.lightboxIndex < this.lightboxImages.length - 1) this.lightboxIndex++;
+    if (this.lightboxIndex < this.lightboxImages.length - 1) {
+      this.lightboxIndex++;
+      this.imageZoom = 1;
+    }
+  }
+
+  zoomIn() {
+    this.imageZoom += 0.25;
+  }
+
+  zoomOut() {
+    this.imageZoom = Math.max(0.25, this.imageZoom - 0.25);
+  }
+
+  resetZoom() {
+    this.imageZoom = 1;
   }
 
   clearFilters() {

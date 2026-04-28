@@ -266,7 +266,16 @@
             <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
           </button>
           <div class="lightbox-img-container">
-            <img [src]="lightboxImages[lightboxIndex]?.url" alt="Check image" class="lightbox-img" />
+            <div class="zoom-controls">
+              <button class="zoom-btn" title="Zoom Out" (click)="zoomOut()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+              </button>
+              <button class="zoom-label" title="Reset Zoom" (click)="resetZoom()">{{ imageZoom * 100 | number:'1.0-0' }}%</button>
+              <button class="zoom-btn" title="Zoom In" (click)="zoomIn()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+              </button>
+            </div>
+            <img [src]="lightboxImages[lightboxIndex]?.url" alt="Check image" class="lightbox-img" [style.width.%]="imageZoom * 100" />
           </div>
           <button class="lightbox-nav next-btn" (click)="nextImage()" [disabled]="lightboxIndex === lightboxImages.length - 1">
             <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
@@ -289,8 +298,8 @@
         </div>
       </div>
       
-      <!-- Right side: Details -->
-      <div class="lightbox-details-section" [style.width]="lightboxImages.length > 0 ? '380px' : '100%'">
+      <!-- Bottom side: Details -->
+      <div class="lightbox-details-section">
         <h3 class="details-section-title">Check Field Data</h3>
         <div class="details-grid">
           <div class="detail-item">
