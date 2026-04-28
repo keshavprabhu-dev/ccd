@@ -77,9 +77,16 @@ async function parseX9Buffer(buffer, uploadDir, uniquePrefix) {
 
       if (recordType === '31') {
         routingNumber  = str.substring(2, 11).trim();
-        accountNumber  = str.substring(11, 31).trim();
+        const onUs = str.substring(11, 31).trim();
+        if (onUs.includes('/')) {
+          const parts = onUs.split('/');
+          accountNumber = parts[0].trim();
+          serialNumber = parts[1].trim();
+        } else {
+          accountNumber = onUs;
+          serialNumber = '';
+        }
         amountStr      = str.substring(31, 41).trim();
-        serialNumber   = '';
       } else {
         // Record 25
         if (recordLength <= 80) {

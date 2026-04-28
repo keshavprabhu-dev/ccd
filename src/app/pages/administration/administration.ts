@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { App } from '../../app';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../../environments/environment.development';
 
 const API = `${environment.apiUrl}/administration`;
 
@@ -11,7 +11,12 @@ interface User {
   id?: string;
   username: string;
   password?: string;
-  role: string;
+  email?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  userType?: string;
   status: string;
   // standard audit fields
   createdBy?: string;
@@ -72,7 +77,12 @@ export class Administration implements OnInit {
     return {
       username: '',
       password: '',
-      role: 'checker',
+      email: '',
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      phoneNumber: '',
+      userType: 'Standard User',
       status: 'ACTIVE',
       modifiedCount: 0
     };

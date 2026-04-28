@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { App } from '../../app';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../../environments/environment.development';
 
 const API = `${environment.apiUrl}/stop-payments`;
 
@@ -233,12 +233,133 @@ export class StopPayments implements OnInit {
     const v = this.newRecord;
     const isValid = !!(
       v.accountNumber?.trim() &&
-      v.serialNumber?.trim() &&
-      v.date?.trim() &&
-      v.beneficiaryName?.trim() &&
-      v.amount > 0
+      v.serialNumber?.trim()
     );
     return isValid;
+  }
+
+  // ── CSV Upload ─────────────────────────────────────────────────────────────
+  onCsvFileSelected(event: any) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      const lines = text.split('\n');
+      const recordsToCreate: StopPayment[] = [];
+      const now = new Date().toISOString();
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const [accountNumber, serialNumber, date, amount, beneficiaryName, reason] = line.split(',');
+        if (accountNumber && serialNumber) {
+          recordsToCreate.push({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9) + i,
+            accountNumber, serialNumber,
+            date: date || now.split('T')[0],
+            amount: Number(amount) || 0,
+            beneficiaryName: beneficiaryName || '',
+            reason: reason || '',
+            status: 'STOP',
+            createdBy: this.currentUser,
+            createdTimestamp: now
+          });
+        }
+      }
+
+      if (recordsToCreate.length === 0) return;
+
+      this.http.post(`${API}/bulk`, recordsToCreate).subscribe({
+        next: () => {
+          this.showToast(`Successfully uploaded ${recordsToCreate.length} stops from CSV.`);
+          this.loadAll();
+          event.target.value = '';
+        },
+        error: (err) => {
+          console.error('Bulk upload error:', err);
+          this.showToast('⚠️ Failed to upload CSV stops.');
+        }
+      });
+    };
+    reader.readAsText(file);
+  }
+
+  // ── Ranged Stops ───────────────────────────────────────────────────────────
+  showRangedModal = false;
+  showRemoveRangedModal = false;
+  rangedStop = { accountNumber: '', startSerial: '', endSerial: '', reason: '' };
+
+  openRangedModal() {
+    this.rangedStop = { accountNumber: '', startSerial: '', endSerial: '', reason: '' };
+    this.showRangedModal = true;
+  }
+
+  openRemoveRangedModal() {
+    this.rangedStop = { accountNumber: '', startSerial: '', endSerial: '', reason: '' };
+    this.showRemoveRangedModal = true;
+  }
+
+  submitRangedStop() {
+    if (!this.rangedStop.accountNumber || !this.rangedStop.startSerial || !this.rangedStop.endSerial) return;
+    const start = parseInt(this.rangedStop.startSerial);
+    const end = parseInt(this.rangedStop.endSerial);
+    if (start > end) {
+      this.showToast('⚠️ Start serial must be less than or equal to end serial.');
+      return;
+    }
+
+    const recordsToCreate: StopPayment[] = [];
+    const now = new Date().toISOString();
+    
+    for (let i = start; i <= end; i++) {
+      recordsToCreate.push({
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9) + i,
+        accountNumber: this.rangedStop.accountNumber,
+        serialNumber: i.toString(),
+        date: now.split('T')[0],
+        amount: 0,
+        beneficiaryName: '',
+        reason: this.rangedStop.reason,
+        status: 'STOP',
+        createdBy: this.currentUser,
+        createdTimestamp: now
+      });
+    }
+
+    this.http.post(`${API}/bulk`, recordsToCreate).subscribe({
+      next: () => {
+        this.showToast(`Successfully created ${recordsToCreate.length} ranged stops.`);
+        this.loadAll();
+        this.showRangedModal = false;
+      },
+      error: (err) => {
+        console.error('Ranged stop error:', err);
+        this.showToast('⚠️ Failed to create ranged stops.');
+      }
+    });
+  }
+
+  submitRemoveRangedStop() {
+    if (!this.rangedStop.accountNumber || !this.rangedStop.startSerial || !this.rangedStop.endSerial) return;
+    
+    const params = new HttpParams()
+      .set('accountNumber', this.rangedStop.accountNumber)
+      .set('startSerial', this.rangedStop.startSerial)
+      .set('endSerial', this.rangedStop.endSerial);
+
+    this.http.delete(`${API}/bulk`, { params }).subscribe({
+      next: (res: any) => {
+        this.showToast(`Successfully removed ${res.deletedCount || 0} ranged stops.`);
+        this.loadAll();
+        this.showRemoveRangedModal = false;
+      },
+      error: (err) => {
+        console.error('Remove ranged stop error:', err);
+        this.showToast('⚠️ Failed to remove ranged stops.');
+      }
+    });
   }
 
   submitForm() {

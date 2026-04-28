@@ -3,7 +3,7 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { App } from '../../app';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../../environments/environment.development';
 
 const API = `${environment.apiUrl}/issuance`;
 
@@ -29,6 +29,7 @@ interface IssuanceRecord {
   serialNumber: string;
   accountNumber: string;
   beneficiaryName: string;
+  beneficiaryAddress?: string;
   amount: number;
   // standard audit fields
   createdBy?: string;
@@ -187,6 +188,7 @@ export class IssuanceManagement implements OnInit {
     serialNumber: '',
     accountNumber: '',
     beneficiaryName: '',
+    beneficiaryAddress: '',
     amount: ''
   };
 
@@ -195,7 +197,7 @@ export class IssuanceManagement implements OnInit {
   toggleFilters() {
     this.showFilters = !this.showFilters;
     if (!this.showFilters) {
-      this.filters = { date: '', serialNumber: '', accountNumber: '', beneficiaryName: '', amount: '' };
+      this.filters = { date: '', serialNumber: '', accountNumber: '', beneficiaryName: '', beneficiaryAddress: '', amount: '' };
       this.applyFilters();
     }
   }
@@ -206,6 +208,7 @@ export class IssuanceManagement implements OnInit {
     serialNumber: true,
     accountNumber: true,
     beneficiaryName: true,
+    beneficiaryAddress: false,
     amount: true,
     createdBy: false,
     createdTimestamp: false,
@@ -229,6 +232,7 @@ export class IssuanceManagement implements OnInit {
       serialNumber: '',
       accountNumber: '',
       beneficiaryName: '',
+      beneficiaryAddress: '',
       amount: 0,
       createdBy: '',
       createdTimestamp: '',
@@ -375,7 +379,8 @@ export class IssuanceManagement implements OnInit {
               serialNumber: serialNumber,
               accountNumber: accountNumber,
               beneficiaryName: parts[3]?.trim() || '',
-              amount: parseFloat(parts[4]) || 0,
+              beneficiaryAddress: parts[4]?.trim() || '',
+              amount: parseFloat(parts[5]) || parseFloat(parts[4]) || 0, // Fallback for old CSVs
               createdBy: this.currentUser,
               createdTimestamp: new Date().toISOString(),
               modifiedCount: 0,
@@ -454,9 +459,10 @@ export class IssuanceManagement implements OnInit {
       const matchSerial = record.serialNumber.toLowerCase().includes(this.filters.serialNumber.toLowerCase());
       const matchAccount = record.accountNumber.toLowerCase().includes(this.filters.accountNumber.toLowerCase());
       const matchBeneficiary = record.beneficiaryName.toLowerCase().includes(this.filters.beneficiaryName.toLowerCase());
+      const matchAddress = record.beneficiaryAddress ? record.beneficiaryAddress.toLowerCase().includes(this.filters.beneficiaryAddress.toLowerCase()) : true;
       const matchAmount = this.filters.amount ? record.amount.toString().includes(this.filters.amount) : true;
       
-      return matchDate && matchSerial && matchAccount && matchBeneficiary && matchAmount;
+      return matchDate && matchSerial && matchAccount && matchBeneficiary && matchAddress && matchAmount;
     });
     // Reset to first page whenever filters change
     this.currentPage = 1;
@@ -520,14 +526,14 @@ export class IssuanceManagement implements OnInit {
     if (this.filteredRecords.length === 0) return;
     
     const headers = [
-      'Issued Date', 'Serial Number', 'Account Number', 'Beneficiary', 'Amount',
+      'Issued Date', 'Serial Number', 'Account Number', 'Beneficiary', 'Address', 'Amount',
       'Created By', 'Created Timestamp', 'Modified By', 'Modified Timestamp',
       'Approved By', 'Approved Timestamp', 'Modified Count', 'Status'
     ];
 
     const csvLines = this.filteredRecords.map(r => {
       return [
-        r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.amount,
+        r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress || '', r.amount,
         r.createdBy || '', r.createdTimestamp || '', r.modifiedBy || '',
         r.modifiedTimestamp || '', r.approvedBy || '', r.approvedTimestamp || '',
         r.modifiedCount || 0, r.recordStatus || ''

@@ -19,8 +19,11 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// Fixed JSON payload limit (10mb replaces 100mb)
-app.use(express.json({ limit: '10mb' }));
+// JSON payload limit increased to support large base64 encoded ICL files
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
+
+
 
 // Ensure db directory exists
 const dbDir = path.join(__dirname, 'db');
@@ -31,10 +34,12 @@ if (!fs.existsSync(dbDir)) {
 // Connect to databases
 const issuanceDb = new sqlite3.Database(path.join(dbDir, 'issuance.db'));
 const stopPaymentsDb = new sqlite3.Database(path.join(dbDir, 'stop_payments.db'));
+const adminDb = new sqlite3.Database(path.join(dbDir, 'administration.db'));
 
 // Set busy timeout to prevent "database is locked" errors
 issuanceDb.configure('busyTimeout', 10000);
 stopPaymentsDb.configure('busyTimeout', 10000);
+adminDb.configure('busyTimeout', 10000);
 
 // Initialize tables
 issuanceDb.serialize(() => {
@@ -80,6 +85,10 @@ issuanceDb.serialize(() => {
       authStatus TEXT
     )
   `);
+
+  issuanceDb.run("ALTER TABLE issuance_records ADD COLUMN beneficiaryAddress TEXT", (err) => {
+    // Ignore error if column already exists
+  });
 });
 
 stopPaymentsDb.serialize(() => {
@@ -103,6 +112,43 @@ stopPaymentsDb.serialize(() => {
       authStatus TEXT
     )
   `);
+});
+
+adminDb.serialize(() => {
+  adminDb.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE,
+      password TEXT,
+      email TEXT,
+      firstName TEXT,
+      middleName TEXT,
+      lastName TEXT,
+      phoneNumber TEXT,
+      userType TEXT,
+      status TEXT,
+      createdBy TEXT,
+      createdTimestamp TEXT,
+      modifiedBy TEXT,
+      modifiedTimestamp TEXT,
+      modifiedCount INTEGER,
+      approvedBy TEXT,
+      approvedTimestamp TEXT,
+      authStatus TEXT
+    )
+  `);
+  // Insert a default admin user if none exists
+  adminDb.get("SELECT COUNT(*) as count FROM users", (err, row) => {
+    if (!err && row.count === 0) {
+      adminDb.run(`
+        INSERT INTO users (
+          id, username, password, email, firstName, lastName, userType, status, createdBy, createdTimestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        'U' + Date.now(), 'admin', 'admin', 'admin@example.com', 'System', 'Admin', 'Administrator', 'ACTIVE', 'System', new Date().toISOString()
+      ]);
+    }
+  });
 });
 
 // Issuance API Routes
@@ -155,16 +201,16 @@ app.post('/api/issuance/files', (req, res) => {
         issuanceDb.serialize(() => {
           const insertRecord = issuanceDb.prepare(`
             INSERT INTO issuance_records (
-              id, date, serialNumber, accountNumber, beneficiaryName, amount, createdBy, 
+              id, date, serialNumber, accountNumber, beneficiaryName, beneficiaryAddress, amount, createdBy, 
               createdTimestamp, modifiedBy, modifiedTimestamp, approvedBy, approvedTimestamp, 
               modifiedCount, recordStatus, previousStatus, fileId, historyList, authStatus
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `);
           
           let hasError = false;
           file.records.forEach(r => {
             insertRecord.run(
-              r.id, r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.amount, 
+              r.id, r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress, r.amount, 
               r.createdBy, r.createdTimestamp || new Date().toISOString(), r.modifiedBy, r.modifiedTimestamp, 
               r.approvedBy, r.approvedTimestamp, r.modifiedCount || 0, r.recordStatus, 
               r.previousStatus, file.id, JSON.stringify(r.historyList || []), r.authStatus,
@@ -201,12 +247,12 @@ app.post('/api/issuance/records', (req, res) => {
   const r = req.body;
   issuanceDb.run(`
     INSERT INTO issuance_records (
-      id, date, serialNumber, accountNumber, beneficiaryName, amount, createdBy, 
+      id, date, serialNumber, accountNumber, beneficiaryName, beneficiaryAddress, amount, createdBy, 
       createdTimestamp, modifiedBy, modifiedTimestamp, approvedBy, approvedTimestamp, 
       modifiedCount, recordStatus, previousStatus, fileId, historyList, authStatus
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
-    r.id, r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.amount, 
+    r.id, r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress, r.amount, 
     r.createdBy, r.createdTimestamp || new Date().toISOString(), r.modifiedBy, r.modifiedTimestamp, 
     r.approvedBy, r.approvedTimestamp, r.modifiedCount || 0, r.recordStatus || 'NEW', 
     r.previousStatus, r.fileId || null, JSON.stringify(r.historyList || []), r.authStatus
@@ -241,13 +287,13 @@ app.put('/api/issuance/records/:id', (req, res) => {
   const id = req.params.id;
   issuanceDb.run(`
     UPDATE issuance_records SET
-      date = ?, serialNumber = ?, accountNumber = ?, beneficiaryName = ?, amount = ?, 
+      date = ?, serialNumber = ?, accountNumber = ?, beneficiaryName = ?, beneficiaryAddress = ?, amount = ?, 
       createdBy = ?, createdTimestamp = ?, modifiedBy = ?, modifiedTimestamp = ?, 
       approvedBy = ?, approvedTimestamp = ?, modifiedCount = ?, recordStatus = ?, 
       previousStatus = ?, historyList = ?, authStatus = ?
     WHERE id = ?
   `, [
-    r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.amount, 
+    r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress, r.amount, 
     r.createdBy, r.createdTimestamp, r.modifiedBy, r.modifiedTimestamp, 
     r.approvedBy, r.approvedTimestamp, r.modifiedCount, r.recordStatus, 
     r.previousStatus, JSON.stringify(r.historyList || []), r.authStatus, id
@@ -310,6 +356,54 @@ app.post('/api/stop-payments', (req, res) => {
   });
 });
 
+app.post('/api/stop-payments/bulk', (req, res) => {
+  const records = req.body;
+  if (!Array.isArray(records)) return res.status(400).json({ error: 'Expected an array of records' });
+
+  stopPaymentsDb.serialize(() => {
+    stopPaymentsDb.run("BEGIN TRANSACTION");
+    const stmt = stopPaymentsDb.prepare(`
+      INSERT INTO stop_payments (
+        id, accountNumber, serialNumber, date, amount, reason, beneficiaryName, status,
+        createdBy, createdTimestamp, modifiedBy, modifiedTimestamp, modifiedCount,
+        approvedBy, approvedTimestamp, authStatus
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    let hasError = false;
+    records.forEach(r => {
+      stmt.run([
+        r.id, r.accountNumber, r.serialNumber, r.date, r.amount, r.reason, r.beneficiaryName, r.status,
+        r.createdBy, r.createdTimestamp, r.modifiedBy, r.modifiedTimestamp, r.modifiedCount || 0,
+        r.approvedBy, r.approvedTimestamp, r.authStatus
+      ], (err) => {
+        if (err) hasError = true;
+      });
+    });
+
+    stmt.finalize();
+    stopPaymentsDb.run("COMMIT", (err) => {
+      if (err || hasError) return res.status(500).json({ error: 'Failed to insert some or all records' });
+      res.json({ success: true, count: records.length });
+    });
+  });
+});
+
+app.delete('/api/stop-payments/bulk', (req, res) => {
+  const { accountNumber, startSerial, endSerial } = req.query;
+  if (!accountNumber || !startSerial || !endSerial) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+
+  stopPaymentsDb.run(`
+    DELETE FROM stop_payments 
+    WHERE accountNumber = ? AND CAST(serialNumber AS INTEGER) >= ? AND CAST(serialNumber AS INTEGER) <= ?
+  `, [accountNumber, parseInt(startSerial), parseInt(endSerial)], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deletedCount: this.changes });
+  });
+});
+
 app.put('/api/stop-payments/:id', (req, res) => {
   const r = req.body;
   const id = req.params.id;
@@ -336,6 +430,84 @@ app.delete('/api/stop-payments/:id', (req, res) => {
   });
 });
 
+// Administration API Routes
+
+app.get('/api/administration/users', (req, res) => {
+  adminDb.all('SELECT * FROM users ORDER BY createdTimestamp DESC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/administration/users', (req, res) => {
+  const r = req.body;
+  adminDb.run(`
+    INSERT INTO users (
+      id, username, password, email, firstName, middleName, lastName, phoneNumber, userType, status,
+      createdBy, createdTimestamp, modifiedBy, modifiedTimestamp, modifiedCount,
+      approvedBy, approvedTimestamp, authStatus
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    r.id, r.username, r.password, r.email, r.firstName, r.middleName, r.lastName, r.phoneNumber, r.userType, r.status,
+    r.createdBy, r.createdTimestamp, r.modifiedBy, r.modifiedTimestamp, r.modifiedCount || 0,
+    r.approvedBy, r.approvedTimestamp, r.authStatus
+  ], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ ...r, id: r.id });
+  });
+});
+
+app.put('/api/administration/users/:id', (req, res) => {
+  const r = req.body;
+  const id = req.params.id;
+
+  adminDb.get('SELECT * FROM users WHERE id = ?', [id], (err, existing) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    // If not existing, it's actually an upsert/creation
+    if (!existing) {
+      adminDb.run(`
+        INSERT INTO users (
+          id, username, password, email, firstName, middleName, lastName, phoneNumber, userType, status,
+          createdBy, createdTimestamp, modifiedBy, modifiedTimestamp, modifiedCount,
+          approvedBy, approvedTimestamp, authStatus
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        id, r.username, r.password, r.email, r.firstName, r.middleName, r.lastName, r.phoneNumber, r.userType, r.status,
+        r.createdBy, r.createdTimestamp, r.modifiedBy, r.modifiedTimestamp, r.modifiedCount || 0,
+        r.approvedBy, r.approvedTimestamp, r.authStatus
+      ], function(insertErr) {
+        if (insertErr) return res.status(500).json({ error: insertErr.message });
+        return res.json({ ...r, id });
+      });
+      return;
+    }
+
+    // Otherwise update
+    adminDb.run(`
+      UPDATE users SET
+        username = ?, password = ?, email = ?, firstName = ?, middleName = ?, lastName = ?, 
+        phoneNumber = ?, userType = ?, status = ?, modifiedBy = ?, modifiedTimestamp = ?, 
+        modifiedCount = ?, approvedBy = ?, approvedTimestamp = ?, authStatus = ?
+      WHERE id = ?
+    `, [
+      r.username, r.password || existing.password, r.email, r.firstName, r.middleName, r.lastName, 
+      r.phoneNumber, r.userType, r.status, r.modifiedBy, r.modifiedTimestamp, 
+      r.modifiedCount, r.approvedBy, r.approvedTimestamp, r.authStatus, id
+    ], function(updateErr) {
+      if (updateErr) return res.status(500).json({ error: updateErr.message });
+      res.json({ ...r, id });
+    });
+  });
+});
+
+app.delete('/api/administration/users/:id', (req, res) => {
+  adminDb.run('DELETE FROM users WHERE id = ?', [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
 // ── ICL Parser Endpoint ───────────────────────────────────────────────────
 const iclUploadDir = path.join(__dirname, 'uploads', 'icl');
 if (!fs.existsSync(iclUploadDir)) {
@@ -344,15 +516,15 @@ if (!fs.existsSync(iclUploadDir)) {
 app.use('/api/images/icl', express.static(iclUploadDir));
 
 app.post('/api/icl-parser/upload', async (req, res) => {
-  const { fileName, fileContent } = req.body;
+  const { fileName, fileContent, override } = req.body;
   if (!fileName || !fileContent) {
     return res.status(400).json({ error: 'Missing fileName or fileContent' });
   }
 
   const filePath = path.join(iclUploadDir, fileName);
-  // if (fs.existsSync(filePath)) {
-  //   return res.status(409).json({ error: 'Duplicate - File already Processed' });
-  // }
+  if (fs.existsSync(filePath) && !override) {
+    return res.status(409).json({ error: 'Duplicate - File already Processed' });
+  }
 
   try {
     const buffer = Buffer.from(fileContent, 'base64');

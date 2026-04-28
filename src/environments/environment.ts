@@ -1,4 +1,4 @@
 export const environment = {
-  production: true,
-  apiUrl: '/api' // Assuming same origin or relative for production reverse proxy
+  production: false,
+  apiUrl: `http://${window.location.hostname}:3000/api`
 };

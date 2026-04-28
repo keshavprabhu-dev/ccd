@@ -3,7 +3,7 @@ import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { SumPipe, SumFieldPipe, CountImagesPipe } from './icl-pipes';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../../environments/environment.development';
 
 @Component({
   selector: 'app-icl-parser',
@@ -93,7 +93,7 @@ export class IclParser implements OnInit {
     if (fi) fi.value = '';
   }
 
-  uploadFile() {
+  uploadFile(override = false) {
     if (!this.selectedFile) return;
     this.isUploading = true;
     this.message = '';
@@ -107,7 +107,8 @@ export class IclParser implements OnInit {
 
       this.http.post(`${environment.apiUrl}/icl-parser/upload`, {
         fileName: this.selectedFile!.name,
-        fileContent: base64Content
+        fileContent: base64Content,
+        override: override
       }).subscribe({
         next: (response: any) => {
           this.isUploading = false;
@@ -122,9 +123,19 @@ export class IclParser implements OnInit {
         },
         error: (err) => {
           this.isUploading = false;
-          this.isError = true;
-          this.message = err.status === 409 ? 'This file has already been processed.' : 'An error occurred during upload.';
-          this.cdr.detectChanges();
+          if (err.status === 409) {
+             if (confirm("Warning: A file with this name has already been uploaded. Are you sure you want to load and parse it again?")) {
+                 this.uploadFile(true);
+             } else {
+                 this.isError = true;
+                 this.message = 'Upload cancelled (Duplicate file).';
+                 this.cdr.detectChanges();
+             }
+          } else {
+            this.isError = true;
+            this.message = 'An error occurred during upload.';
+            this.cdr.detectChanges();
+          }
         }
       });
     };

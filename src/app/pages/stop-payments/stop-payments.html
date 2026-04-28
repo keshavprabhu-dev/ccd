@@ -46,6 +46,16 @@
           <span class="record-count">{{ filteredRecords.length }} record(s)</span>
         </div>
         <div class="header-buttons">
+          <input type="file" #csvInput style="display: none" accept=".csv" (change)="onCsvFileSelected($event)">
+          <button type="button" class="btn-outline-small flex-center" (click)="csvInput.click()" title="Upload CSV">
+            Upload CSV
+          </button>
+          <button type="button" class="btn-outline-small flex-center" (click)="openRangedModal()" title="Add Ranged Stop">
+            Add Range
+          </button>
+          <button type="button" class="btn-outline-small flex-center" (click)="openRemoveRangedModal()" title="Remove Ranged Stop" style="color: #ef4444; border-color: #fecaca;">
+            Remove Range
+          </button>
           <button type="button" class="btn-primary-small flex-center" (click)="startNew()" title="New Stop Payment">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right: 4px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             New Stop Payment
@@ -173,19 +183,19 @@
       </div>
 
       <div class="form-group">
-        <label for="f-date">Date <span class="required">*</span></label>
+        <label for="f-date">Date</label>
         <input id="f-date" name="f-date" type="date" class="form-control"
           [(ngModel)]="newRecord.date" [disabled]="!isFormEditable">
       </div>
 
       <div class="form-group">
-        <label for="f-beneficiary">Beneficiary Name <span class="required">*</span></label>
+        <label for="f-beneficiary">Beneficiary Name</label>
         <input id="f-beneficiary" name="f-beneficiary" type="text" class="form-control" placeholder="Enter beneficiary name…"
           [(ngModel)]="newRecord.beneficiaryName" [disabled]="!isFormEditable">
       </div>
 
       <div class="form-group">
-        <label for="f-amount">Amount <span class="required">*</span></label>
+        <label for="f-amount">Amount</label>
         <input id="f-amount" name="f-amount" type="number" class="form-control" placeholder="0.00" min="0" step="0.01"
           [(ngModel)]="newRecord.amount" [disabled]="!isFormEditable">
       </div>
@@ -280,5 +290,63 @@
     <div class="modal-footer">
       <button type="button" class="btn-secondary" (click)="closeStatsModal()">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- Ranged Stop Modal -->
+<div class="modal-overlay" *ngIf="showRangedModal" (click)="showRangedModal = false">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="form-header-actions" style="margin-bottom: 1.5rem;">
+      <h3 style="margin-bottom: 0;">Add Ranged Stop</h3>
+      <button type="button" class="btn-icon" (click)="showRangedModal = false">
+        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <form (ngSubmit)="submitRangedStop()">
+      <div class="form-group">
+        <label>Account Number <span class="required">*</span></label>
+        <input type="text" class="form-control" [(ngModel)]="rangedStop.accountNumber" name="r_account" required>
+      </div>
+      <div class="form-group">
+        <label>Start Serial Number <span class="required">*</span></label>
+        <input type="number" class="form-control" [(ngModel)]="rangedStop.startSerial" name="r_start" required>
+      </div>
+      <div class="form-group">
+        <label>End Serial Number <span class="required">*</span></label>
+        <input type="number" class="form-control" [(ngModel)]="rangedStop.endSerial" name="r_end" required>
+      </div>
+      <div class="form-group">
+        <label>Reason</label>
+        <textarea class="form-control" [(ngModel)]="rangedStop.reason" name="r_reason" rows="2"></textarea>
+      </div>
+      <button type="submit" class="btn-primary" style="margin-top: 1rem;">Submit Ranged Stop</button>
+    </form>
+  </div>
+</div>
+
+<!-- Remove Ranged Stop Modal -->
+<div class="modal-overlay" *ngIf="showRemoveRangedModal" (click)="showRemoveRangedModal = false">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="form-header-actions" style="margin-bottom: 1.5rem;">
+      <h3 style="margin-bottom: 0;">Remove Ranged Stop</h3>
+      <button type="button" class="btn-icon" (click)="showRemoveRangedModal = false">
+        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <form (ngSubmit)="submitRemoveRangedStop()">
+      <div class="form-group">
+        <label>Account Number <span class="required">*</span></label>
+        <input type="text" class="form-control" [(ngModel)]="rangedStop.accountNumber" name="rr_account" required>
+      </div>
+      <div class="form-group">
+        <label>Start Serial Number <span class="required">*</span></label>
+        <input type="number" class="form-control" [(ngModel)]="rangedStop.startSerial" name="rr_start" required>
+      </div>
+      <div class="form-group">
+        <label>End Serial Number <span class="required">*</span></label>
+        <input type="number" class="form-control" [(ngModel)]="rangedStop.endSerial" name="rr_end" required>
+      </div>
+      <button type="submit" class="btn-primary" style="margin-top: 1rem; background: #ef4444; border-color: #ef4444;">Remove Ranged Stop</button>
+    </form>
   </div>
 </div>

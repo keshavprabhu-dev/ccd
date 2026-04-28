@@ -18,7 +18,8 @@
             <thead>
               <tr>
                 <th>Username</th>
-                <th>Role</th>
+                <th>Name</th>
+                <th>Type</th>
                 <th>Status</th>
                 <th>Auth Status</th>
               </tr>
@@ -26,7 +27,8 @@
             <tbody>
               <tr *ngFor="let u of users" (click)="selectUser(u)" class="clickable-row" [class.selected-row]="selectedUser?.id === u.id">
                 <td>{{ u.username }}</td>
-                <td>{{ u.role }}</td>
+                <td>{{ u.firstName }} {{ u.lastName }}</td>
+                <td>{{ u.userType }}</td>
                 <td>
                   <span class="status-badge" [ngClass]="getStatusClass(u.status)">{{ u.status }}</span>
                 </td>
@@ -64,11 +66,36 @@
           </div>
 
           <div class="form-group">
-            <label for="role">Role <span class="required">*</span></label>
-            <select id="role" [(ngModel)]="newUser.role" name="role" class="form-control" [disabled]="!isFormEditable">
-              <option value="maker">Maker</option>
-              <option value="checker">Checker</option>
-              <option value="administrator">Administrator</option>
+            <label for="firstName">First Name</label>
+            <input type="text" id="firstName" [(ngModel)]="newUser.firstName" name="firstName" class="form-control" [disabled]="!isFormEditable">
+          </div>
+
+          <div class="form-group">
+            <label for="middleName">Middle Name</label>
+            <input type="text" id="middleName" [(ngModel)]="newUser.middleName" name="middleName" class="form-control" [disabled]="!isFormEditable">
+          </div>
+
+          <div class="form-group">
+            <label for="lastName">Last Name</label>
+            <input type="text" id="lastName" [(ngModel)]="newUser.lastName" name="lastName" class="form-control" [disabled]="!isFormEditable">
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" [(ngModel)]="newUser.email" name="email" class="form-control" [disabled]="!isFormEditable">
+          </div>
+
+          <div class="form-group">
+            <label for="phoneNumber">Phone Number</label>
+            <input type="text" id="phoneNumber" [(ngModel)]="newUser.phoneNumber" name="phoneNumber" class="form-control" [disabled]="!isFormEditable">
+          </div>
+
+          <div class="form-group">
+            <label for="userType">User Type <span class="required">*</span></label>
+            <select id="userType" [(ngModel)]="newUser.userType" name="userType" class="form-control" [disabled]="!isFormEditable">
+              <option value="Administrator">Administrator</option>
+              <option value="Standard User">Standard User</option>
+              <option value="Guest">Guest</option>
             </select>
           </div>
 

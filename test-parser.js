@@ -130,4 +130,17 @@ async function parseX9File(filePath) {
   return { checks, fileTotals, standardLevel };
 }
 
-parseX9File(path.join(__dirname, 'server', 'uploads', 'icl', 'Test ICL with 10 checks.x9'));
+(async () => {
+  const inputDir = path.join(__dirname, 'input');
+  const files = fs.readdirSync(inputDir);
+  for (const file of files) {
+    if (file.endsWith('.x9')) {
+      console.log(`\n\n=== Parsing ${file} ===`);
+      try {
+        await parseX9File(path.join(inputDir, file));
+      } catch (err) {
+        console.error(`Error parsing ${file}:`, err);
+      }
+    }
+  }
+})();

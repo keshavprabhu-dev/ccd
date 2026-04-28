@@ -48,6 +48,7 @@
       </div>
 
       <div class="column-config-panel" *ngIf="showColumnConfig">
+        <label><input type="checkbox" [(ngModel)]="columns.beneficiaryAddress"> Beneficiary Address</label>
         <label><input type="checkbox" [(ngModel)]="columns.createdBy"> Created By</label>
         <label><input type="checkbox" [(ngModel)]="columns.createdTimestamp"> Created Date</label>
         <label><input type="checkbox" [(ngModel)]="columns.modifiedBy"> Modified By</label>
@@ -80,6 +81,10 @@
                 <div class="th-content">Beneficiary Name</div>
                 <input *ngIf="showFilters" type="text" [(ngModel)]="filters.beneficiaryName" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Beneficiary">
               </th>
+              <th *ngIf="columns.beneficiaryAddress">
+                <div class="th-content">Beneficiary Address</div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.beneficiaryAddress" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Address">
+              </th>
               <th *ngIf="columns.amount">
                 <div class="th-content">Amount</div>
                 <input *ngIf="showFilters" type="text" [(ngModel)]="filters.amount" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Amount">
@@ -106,6 +111,7 @@
               <td *ngIf="columns.serialNumber">{{ record.serialNumber }}</td>
               <td *ngIf="columns.accountNumber">{{ record.accountNumber }}</td>
               <td *ngIf="columns.beneficiaryName">{{ record.beneficiaryName }}</td>
+              <td *ngIf="columns.beneficiaryAddress">{{ record.beneficiaryAddress }}</td>
               <td *ngIf="columns.amount">{{ record.amount | number:'1.2-2' }}</td>
               <td *ngIf="columns.createdBy">{{ record.createdBy }}</td>
               <td *ngIf="columns.createdTimestamp">{{ record.createdTimestamp | date:'short' }}</td>
@@ -235,6 +241,11 @@
       <div class="form-group">
         <label for="beneficiaryName">Beneficiary Name</label>
         <input type="text" id="beneficiaryName" name="beneficiaryName" [(ngModel)]="newRecord.beneficiaryName" class="form-control" required [disabled]="!isFormEditable">
+      </div>
+
+      <div class="form-group">
+        <label for="beneficiaryAddress">Beneficiary Address</label>
+        <input type="text" id="beneficiaryAddress" name="beneficiaryAddress" [(ngModel)]="newRecord.beneficiaryAddress" class="form-control" [disabled]="!isFormEditable">
       </div>
 
       <div class="form-group">
