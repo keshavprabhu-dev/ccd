@@ -89,6 +89,60 @@ issuanceDb.serialize(() => {
   issuanceDb.run("ALTER TABLE issuance_records ADD COLUMN beneficiaryAddress TEXT", (err) => {
     // Ignore error if column already exists
   });
+
+  issuanceDb.run(`
+    CREATE TABLE IF NOT EXISTS check_issuance (
+      id TEXT PRIMARY KEY,
+      accountNumber TEXT,
+      SerialNumber TEXT,
+      Date TEXT,
+      Amount REAL,
+      CurrencyCode TEXT,
+      beneficiaryName TEXT,
+      beneficiaryAddressLine1 TEXT,
+      beneficiaryAddressLine2 TEXT,
+      beneficiaryTownName TEXT,
+      beneficiaryStateCode TEXT,
+      beneficiaryCountryCode TEXT,
+      RecordStatus TEXT,
+      Remarks TEXT,
+      createdBy TEXT,
+      createdTimestamp TEXT,
+      modifiedBy TEXT,
+      modifiedTimestamp TEXT,
+      approvedBy TEXT,
+      approvedTimestamp TEXT,
+      approvalStatus TEXT,
+      modifiedCount INTEGER
+    )
+  `);
+
+  issuanceDb.run(`
+    CREATE TABLE IF NOT EXISTS check_payments (
+      id TEXT PRIMARY KEY,
+      AccountNumber TEXT,
+      SerialNumber TEXT,
+      Date TEXT,
+      Amount REAL,
+      CurrencyCode TEXT,
+      BeneficiaryName TEXT,
+      BeneficiaryAddressLine1 TEXT,
+      BeneficiaryAddressLine2 TEXT,
+      BeneficiaryTownName TEXT,
+      BeneficiaryStateCode TEXT,
+      BeneficiaryCountryCode TEXT,
+      RecordStatus TEXT,
+      Remarks TEXT,
+      createdBy TEXT,
+      createdTimestamp TEXT,
+      modifiedBy TEXT,
+      modifiedTimestamp TEXT,
+      approvedBy TEXT,
+      approvedTimestamp TEXT,
+      approvalStatus TEXT,
+      modifiedCount INTEGER
+    )
+  `);
 });
 
 stopPaymentsDb.serialize(() => {
@@ -110,6 +164,33 @@ stopPaymentsDb.serialize(() => {
       approvedBy TEXT,
       approvedTimestamp TEXT,
       authStatus TEXT
+    )
+  `);
+
+  stopPaymentsDb.run(`
+    CREATE TABLE IF NOT EXISTS check_stops (
+      id TEXT PRIMARY KEY,
+      AccountNumber TEXT,
+      SerialNumber TEXT,
+      Date TEXT,
+      Amount REAL,
+      CurrencyCode TEXT,
+      BeneficiaryName TEXT,
+      BeneficiaryAddressLine1 TEXT,
+      BeneficiaryAddressLine2 TEXT,
+      BeneficiaryTownName TEXT,
+      BeneficiaryStateCode TEXT,
+      BeneficiaryCountryCode TEXT,
+      RecordStatus TEXT,
+      Remarks TEXT,
+      createdBy TEXT,
+      createdTimestamp TEXT,
+      modifiedBy TEXT,
+      modifiedTimestamp TEXT,
+      approvedBy TEXT,
+      approvedTimestamp TEXT,
+      approvalStatus TEXT,
+      modifiedCount INTEGER
     )
   `);
 });
@@ -148,6 +229,42 @@ adminDb.serialize(() => {
         'U' + Date.now(), 'admin', 'admin', 'admin@example.com', 'System', 'Admin', 'Administrator', 'ACTIVE', 'System', new Date().toISOString()
       ]);
     }
+  });
+
+
+  adminDb.run(`
+    CREATE TABLE IF NOT EXISTS currency_config (
+      code TEXT PRIMARY KEY,
+      name TEXT,
+      isEnabled INTEGER DEFAULT 1
+    )
+  `);
+
+  // Insert default currencies if none exist
+  adminDb.get("SELECT COUNT(*) as count FROM currency_config", (err, row) => {
+    if (!err && row.count === 0) {
+      const defaultCurrencies = [
+        ['USD', 'US Dollar', 1],
+        ['EUR', 'Euro', 1],
+        ['GBP', 'British Pound', 1],
+        ['JPY', 'Japanese Yen', 1],
+        ['CAD', 'Canadian Dollar', 1],
+        ['AUD', 'Australian Dollar', 1],
+        ['CHF', 'Swiss Franc', 1],
+        ['CNY', 'Chinese Yuan', 1],
+        ['INR', 'Indian Rupee', 1]
+      ];
+      const stmt = adminDb.prepare("INSERT INTO currency_config (code, name, isEnabled) VALUES (?, ?, ?)");
+      defaultCurrencies.forEach(c => stmt.run(c));
+      stmt.finalize();
+    }
+  });
+});
+
+app.get('/api/currencies', (req, res) => {
+  adminDb.all('SELECT * FROM currency_config ORDER BY code ASC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
   });
 });
 
@@ -246,16 +363,15 @@ app.delete('/api/issuance/files/:id', (req, res) => {
 app.post('/api/issuance/records', (req, res) => {
   const r = req.body;
   issuanceDb.run(`
-    INSERT INTO issuance_records (
-      id, date, serialNumber, accountNumber, beneficiaryName, beneficiaryAddress, amount, createdBy, 
+    INSERT INTO check_issuance (
+      id, Date, SerialNumber, accountNumber, beneficiaryName, beneficiaryAddressLine1, Amount, createdBy, 
       createdTimestamp, modifiedBy, modifiedTimestamp, approvedBy, approvedTimestamp, 
-      modifiedCount, recordStatus, previousStatus, fileId, historyList, authStatus
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      modifiedCount, RecordStatus
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     r.id, r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress, r.amount, 
     r.createdBy, r.createdTimestamp || new Date().toISOString(), r.modifiedBy, r.modifiedTimestamp, 
-    r.approvedBy, r.approvedTimestamp, r.modifiedCount || 0, r.recordStatus || 'NEW', 
-    r.previousStatus, r.fileId || null, JSON.stringify(r.historyList || []), r.authStatus
+    r.approvedBy, r.approvedTimestamp, r.modifiedCount || 0, r.recordStatus || 'NEW'
   ], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
@@ -263,40 +379,34 @@ app.post('/api/issuance/records', (req, res) => {
 });
 
 app.get('/api/issuance/records', (req, res) => {
-  let query = 'SELECT * FROM issuance_records';
+  let query = 'SELECT * FROM check_issuance';
   let params = [];
-  
-  if (req.query.fileId) {
-    query += ' WHERE fileId = ?';
-    params.push(req.query.fileId);
-  } else if (req.query.orphaned === 'true') {
-    query += ' WHERE fileId IS NULL';
-  }
   
   issuanceDb.all(query, params, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows.map(r => ({
       ...r,
-      historyList: r.historyList ? JSON.parse(r.historyList) : []
+      date: r.Date,
+      serialNumber: r.SerialNumber,
+      amount: r.Amount,
+      recordStatus: r.RecordStatus,
+      beneficiaryAddress: r.beneficiaryAddressLine1
     })));
   });
 });
 
 app.put('/api/issuance/records/:id', (req, res) => {
   const r = req.body;
-  const id = req.params.id;
   issuanceDb.run(`
-    UPDATE issuance_records SET
-      date = ?, serialNumber = ?, accountNumber = ?, beneficiaryName = ?, beneficiaryAddress = ?, amount = ?, 
-      createdBy = ?, createdTimestamp = ?, modifiedBy = ?, modifiedTimestamp = ?, 
-      approvedBy = ?, approvedTimestamp = ?, modifiedCount = ?, recordStatus = ?, 
-      previousStatus = ?, historyList = ?, authStatus = ?
+    UPDATE check_issuance SET
+      Date = ?, SerialNumber = ?, accountNumber = ?, beneficiaryName = ?, beneficiaryAddressLine1 = ?, amount = ?, 
+      modifiedBy = ?, modifiedTimestamp = ?, approvedBy = ?, approvedTimestamp = ?, 
+      modifiedCount = ?, RecordStatus = ?
     WHERE id = ?
   `, [
     r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress, r.amount, 
-    r.createdBy, r.createdTimestamp, r.modifiedBy, r.modifiedTimestamp, 
-    r.approvedBy, r.approvedTimestamp, r.modifiedCount, r.recordStatus, 
-    r.previousStatus, JSON.stringify(r.historyList || []), r.authStatus, id
+    r.modifiedBy, r.modifiedTimestamp, r.approvedBy, r.approvedTimestamp, 
+    r.modifiedCount, r.recordStatus, req.params.id
   ], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
@@ -304,7 +414,7 @@ app.put('/api/issuance/records/:id', (req, res) => {
 });
 
 app.delete('/api/issuance/records/:id', (req, res) => {
-  issuanceDb.run('DELETE FROM issuance_records WHERE id = ?', [req.params.id], (err) => {
+  issuanceDb.run('DELETE FROM check_issuance WHERE id = ?', [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });
@@ -313,16 +423,16 @@ app.delete('/api/issuance/records/:id', (req, res) => {
 // Stop Payments API Routes
 
 app.get('/api/stop-payments', (req, res) => {
-  let query = 'SELECT * FROM stop_payments';
+  let query = 'SELECT * FROM check_stops';
   let params = [];
   const filters = [];
   
   if (req.query.accountNumber) {
-    filters.push('accountNumber = ?');
+    filters.push('AccountNumber = ?');
     params.push(req.query.accountNumber);
   }
   if (req.query.serialNumber) {
-    filters.push('serialNumber = ?');
+    filters.push('SerialNumber = ?');
     params.push(req.query.serialNumber);
   }
   
@@ -334,17 +444,27 @@ app.get('/api/stop-payments', (req, res) => {
   
   stopPaymentsDb.all(query, params, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    res.json(rows.map(r => ({
+      ...r,
+      accountNumber: r.AccountNumber,
+      serialNumber: r.SerialNumber,
+      date: r.Date,
+      amount: r.Amount,
+      currencyCode: r.CurrencyCode,
+      beneficiaryName: r.BeneficiaryName,
+      status: r.RecordStatus,
+      reason: r.Remarks
+    })));
   });
 });
 
 app.post('/api/stop-payments', (req, res) => {
   const r = req.body;
   stopPaymentsDb.run(`
-    INSERT INTO stop_payments (
-      id, accountNumber, serialNumber, date, amount, reason, beneficiaryName, status,
+    INSERT INTO check_stops (
+      id, AccountNumber, SerialNumber, Date, Amount, Remarks, BeneficiaryName, RecordStatus,
       createdBy, createdTimestamp, modifiedBy, modifiedTimestamp, modifiedCount,
-      approvedBy, approvedTimestamp, authStatus
+      approvedBy, approvedTimestamp, approvalStatus
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     r.id, r.accountNumber, r.serialNumber, r.date, r.amount, r.reason, r.beneficiaryName, r.status,
@@ -363,10 +483,10 @@ app.post('/api/stop-payments/bulk', (req, res) => {
   stopPaymentsDb.serialize(() => {
     stopPaymentsDb.run("BEGIN TRANSACTION");
     const stmt = stopPaymentsDb.prepare(`
-      INSERT INTO stop_payments (
-        id, accountNumber, serialNumber, date, amount, reason, beneficiaryName, status,
+      INSERT INTO check_stops (
+        id, AccountNumber, SerialNumber, Date, Amount, Remarks, BeneficiaryName, RecordStatus,
         createdBy, createdTimestamp, modifiedBy, modifiedTimestamp, modifiedCount,
-        approvedBy, approvedTimestamp, authStatus
+        approvedBy, approvedTimestamp, approvalStatus
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
@@ -396,8 +516,8 @@ app.delete('/api/stop-payments/bulk', (req, res) => {
   }
 
   stopPaymentsDb.run(`
-    DELETE FROM stop_payments 
-    WHERE accountNumber = ? AND CAST(serialNumber AS INTEGER) >= ? AND CAST(serialNumber AS INTEGER) <= ?
+    DELETE FROM check_stops 
+    WHERE AccountNumber = ? AND CAST(SerialNumber AS INTEGER) >= ? AND CAST(SerialNumber AS INTEGER) <= ?
   `, [accountNumber, parseInt(startSerial), parseInt(endSerial)], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, deletedCount: this.changes });
@@ -408,10 +528,10 @@ app.put('/api/stop-payments/:id', (req, res) => {
   const r = req.body;
   const id = req.params.id;
   stopPaymentsDb.run(`
-    UPDATE stop_payments SET
-      accountNumber = ?, serialNumber = ?, date = ?, amount = ?, reason = ?, 
-      beneficiaryName = ?, status = ?, modifiedBy = ?, modifiedTimestamp = ?, 
-      modifiedCount = ?, approvedBy = ?, approvedTimestamp = ?, authStatus = ?
+    UPDATE check_stops SET
+      AccountNumber = ?, SerialNumber = ?, Date = ?, Amount = ?, Remarks = ?, 
+      BeneficiaryName = ?, RecordStatus = ?, modifiedBy = ?, modifiedTimestamp = ?, 
+      modifiedCount = ?, approvedBy = ?, approvedTimestamp = ?, approvalStatus = ?
     WHERE id = ?
   `, [
     r.accountNumber, r.serialNumber, r.date, r.amount, r.reason, 
@@ -424,7 +544,7 @@ app.put('/api/stop-payments/:id', (req, res) => {
 });
 
 app.delete('/api/stop-payments/:id', (req, res) => {
-  stopPaymentsDb.run('DELETE FROM stop_payments WHERE id = ?', [req.params.id], (err) => {
+  stopPaymentsDb.run('DELETE FROM check_stops WHERE id = ?', [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });
@@ -545,6 +665,26 @@ app.post('/api/icl-parser/upload', async (req, res) => {
         if (err) console.error('Error saving ICL history:', err);
       }
     );
+
+    // Save checks to check_payments
+    if (parsedData.checks && parsedData.checks.length > 0) {
+      issuanceDb.serialize(() => {
+        const insertPayment = issuanceDb.prepare(`
+          INSERT INTO check_payments (
+            id, AccountNumber, SerialNumber, Date, Amount, CurrencyCode, BeneficiaryName,
+            RecordStatus, createdBy, createdTimestamp, modifiedCount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        parsedData.checks.forEach(check => {
+          const checkId = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+          insertPayment.run([
+            checkId, check.accountNumber, check.serialNumber, check.checkDate || uploadDate,
+            check.amount, 'USD', check.payeeName || '', 'NEW', 'System', uploadDate, 0
+          ]);
+        });
+        insertPayment.finalize();
+      });
+    }
 
     res.status(200).json({ message: 'File successfully parsed!', parsedData });
   } catch (error) {

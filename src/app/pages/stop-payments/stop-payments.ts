@@ -15,6 +15,12 @@ interface StopPayment {
   amount: number;
   reason: string;
   beneficiaryName: string;
+  beneficiaryAddressLine1?: string;
+  beneficiaryAddressLine2?: string;
+  beneficiaryTownName?: string;
+  beneficiaryStateCode?: string;
+  beneficiaryCountryCode?: string;
+  currencyCode?: string;
   status?: string;
   // standard audit fields
   createdBy?: string;
@@ -193,6 +199,12 @@ export class StopPayments implements OnInit {
     return {
       accountNumber: '', serialNumber: '', date: '', amount: 0, reason: '',
       beneficiaryName: '',
+      beneficiaryAddressLine1: '',
+      beneficiaryAddressLine2: '',
+      beneficiaryTownName: '',
+      beneficiaryStateCode: '',
+      beneficiaryCountryCode: '',
+      currencyCode: 'USD',
       status: 'STOP'
     };
   }

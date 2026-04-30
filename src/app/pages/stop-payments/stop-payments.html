@@ -170,40 +170,82 @@
 
     <!-- Scrollable Form Area -->
     <form (ngSubmit)="submitForm()" style="overflow-y: auto; flex: 1; padding-right: 10px;">
-      <div class="form-group">
-        <label for="f-account">Account Number <span class="required">*</span></label>
-        <input id="f-account" name="f-account" type="text" class="form-control" placeholder="e.g. 1234567890"
-          [(ngModel)]="newRecord.accountNumber" [disabled]="!isFormEditable">
+      <!-- Check Details Subsection -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #475569;">Check Details</h4>
+        
+        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="f-account">Account Number <span class="required">*</span></label>
+            <input id="f-account" name="f-account" type="text" class="form-control" placeholder="e.g. 1234567890"
+              [(ngModel)]="newRecord.accountNumber" [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="f-serial">Check Serial Number <span class="required">*</span></label>
+            <input id="f-serial" name="f-serial" type="text" class="form-control" placeholder="e.g. CHK-0012"
+              [(ngModel)]="newRecord.serialNumber" [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="f-date">Date</label>
+            <input id="f-date" name="f-date" type="date" class="form-control"
+              [(ngModel)]="newRecord.date" [disabled]="!isFormEditable">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-bottom: 0;">
+          <div class="form-group" style="flex: 2; margin-bottom: 0;">
+            <label for="f-amount">Amount</label>
+            <input id="f-amount" name="f-amount" type="number" class="form-control" placeholder="0.00" min="0" step="0.01"
+              [(ngModel)]="newRecord.amount" [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="f-currencyCode">Currency Code</label>
+            <input type="text" id="f-currencyCode" name="f-currencyCode" [(ngModel)]="newRecord.currencyCode" class="form-control" [disabled]="!isFormEditable">
+          </div>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="f-serial">Check Serial Number <span class="required">*</span></label>
-        <input id="f-serial" name="f-serial" type="text" class="form-control" placeholder="e.g. CHK-0012"
-          [(ngModel)]="newRecord.serialNumber" [disabled]="!isFormEditable">
-      </div>
+      <!-- Beneficiary Subsection -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #475569;">Beneficiary Details</h4>
+        
+        <div class="form-group">
+          <label for="f-beneficiary">Beneficiary Name</label>
+          <input id="f-beneficiary" name="f-beneficiary" type="text" class="form-control" placeholder="Enter beneficiary name…"
+            [(ngModel)]="newRecord.beneficiaryName" [disabled]="!isFormEditable">
+        </div>
 
-      <div class="form-group">
-        <label for="f-date">Date</label>
-        <input id="f-date" name="f-date" type="date" class="form-control"
-          [(ngModel)]="newRecord.date" [disabled]="!isFormEditable">
-      </div>
+        <div style="display: flex; gap: 1rem;">
+          <div class="form-group" style="flex: 1;">
+            <label for="f-beneficiaryAddressLine1">Address Line 1</label>
+            <input id="f-beneficiaryAddressLine1" name="f-beneficiaryAddressLine1" type="text" class="form-control" [(ngModel)]="newRecord.beneficiaryAddressLine1" [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label for="f-beneficiaryAddressLine2">Address Line 2</label>
+            <input id="f-beneficiaryAddressLine2" name="f-beneficiaryAddressLine2" type="text" class="form-control" [(ngModel)]="newRecord.beneficiaryAddressLine2" [disabled]="!isFormEditable">
+          </div>
+        </div>
 
-      <div class="form-group">
-        <label for="f-beneficiary">Beneficiary Name</label>
-        <input id="f-beneficiary" name="f-beneficiary" type="text" class="form-control" placeholder="Enter beneficiary name…"
-          [(ngModel)]="newRecord.beneficiaryName" [disabled]="!isFormEditable">
-      </div>
+        <div style="display: flex; gap: 1rem;">
+          <div class="form-group" style="flex: 2;">
+            <label for="f-beneficiaryTownName">Town / City</label>
+            <input type="text" id="f-beneficiaryTownName" name="f-beneficiaryTownName" [(ngModel)]="newRecord.beneficiaryTownName" class="form-control" [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label for="f-beneficiaryStateCode">State Code</label>
+            <input type="text" id="f-beneficiaryStateCode" name="f-beneficiaryStateCode" [(ngModel)]="newRecord.beneficiaryStateCode" class="form-control" [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label for="f-beneficiaryCountryCode">Country Code</label>
+            <input type="text" id="f-beneficiaryCountryCode" name="f-beneficiaryCountryCode" [(ngModel)]="newRecord.beneficiaryCountryCode" class="form-control" [disabled]="!isFormEditable">
+          </div>
+        </div>
 
-      <div class="form-group">
-        <label for="f-amount">Amount</label>
-        <input id="f-amount" name="f-amount" type="number" class="form-control" placeholder="0.00" min="0" step="0.01"
-          [(ngModel)]="newRecord.amount" [disabled]="!isFormEditable">
-      </div>
-
-      <div class="form-group">
-        <label for="f-reason">Reason for Stop</label>
-        <textarea id="f-reason" name="f-reason" class="form-control reason-textarea" rows="3" placeholder="Describe the reason for this stop payment…"
-          [(ngModel)]="newRecord.reason" [disabled]="!isFormEditable"></textarea>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="f-reason">Reason for Stop</label>
+          <textarea id="f-reason" name="f-reason" class="form-control reason-textarea" rows="2" placeholder="Describe the reason for this stop payment…"
+            [(ngModel)]="newRecord.reason" [disabled]="!isFormEditable" style="resize: vertical; max-width: 100%;"></textarea>
+        </div>
       </div>
 
       <div class="form-group" *ngIf="selectedRecord">

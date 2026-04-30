@@ -111,7 +111,7 @@
               <td *ngIf="columns.serialNumber">{{ record.serialNumber }}</td>
               <td *ngIf="columns.accountNumber">{{ record.accountNumber }}</td>
               <td *ngIf="columns.beneficiaryName">{{ record.beneficiaryName }}</td>
-              <td *ngIf="columns.beneficiaryAddress">{{ record.beneficiaryAddress }}</td>
+              <td *ngIf="columns.beneficiaryAddress">{{ record.beneficiaryAddressLine1 }}</td>
               <td *ngIf="columns.amount">{{ record.amount | number:'1.2-2' }}</td>
               <td *ngIf="columns.createdBy">{{ record.createdBy }}</td>
               <td *ngIf="columns.createdTimestamp">{{ record.createdTimestamp | date:'short' }}</td>
@@ -204,10 +204,7 @@
       <h3 style="margin-bottom: 0;">{{ selectedRecord ? 'Edit Issuance Record' : 'New Issuance Record' }}</h3>
       <span *ngIf="newRecord.isDuplicate" class="status-badge status-duplicate" style="margin-left: 1rem;">DUPLICATE RECORD DETECTED</span>
       <div style="display: flex; gap: 0.5rem; align-items: center; margin-left: auto;">
-        <!-- New Record Button -->
-        <button type="button" class="btn-icon" (click)="startNewRecord()" title="New Record" aria-label="New Record">
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-        </button>
+
         <!-- Unlock Button -->
         <button type="button" class="btn-icon" *ngIf="selectedRecord && !isFormEditable && ['IMPORTED', 'NEW', 'APPROVED', 'ISSUED'].includes(selectedRecord.recordStatus || '')" (click)="unlockForm()" title="Unlock Form" aria-label="Unlock Form">
           <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m4 4v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
@@ -223,35 +220,88 @@
       </div>
     </div>
     <form (ngSubmit)="submitForm()" class="issuance-form" style="overflow-y: auto; flex: 1; padding-right: 10px;">
-      <div class="form-group">
-        <label for="issuedDate">Issued Date (YYYY-MM-DD)</label>
-        <input type="date" id="issuedDate" name="issuedDate" [(ngModel)]="newRecord.date" class="form-control" required [disabled]="!isFormEditable">
+      <!-- Check Details Subsection -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #475569;">Check Details</h4>
+        
+        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="accountNumber">Account Number</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="accountNumber" name="accountNumber" [(ngModel)]="newRecord.accountNumber" class="form-control" required [disabled]="!isFormEditable">
+              <button type="button" class="btn-outline-small" (click)="openAccountSearch()" [disabled]="!isFormEditable" style="height: 38px;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="serialNumber">Serial Number</label>
+            <input type="text" id="serialNumber" name="serialNumber" [(ngModel)]="newRecord.serialNumber" class="form-control" required [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="issuedDate">Issued Date</label>
+            <input type="date" id="issuedDate" name="issuedDate" [(ngModel)]="newRecord.date" class="form-control" required [disabled]="!isFormEditable">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-bottom: 0;">
+          <div class="form-group" style="flex: 2; margin-bottom: 0;">
+            <label for="amount">Amount</label>
+            <input type="number" id="amount" name="amount" [(ngModel)]="newRecord.amount" class="form-control" required [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="currencyCode">Currency</label>
+            <select id="currencyCode" name="currencyCode" [(ngModel)]="newRecord.currencyCode" class="form-control" [disabled]="!isFormEditable">
+              <option value="" disabled selected>Select...</option>
+              <ng-container *ngFor="let c of availableCurrencies">
+                <option *ngIf="c.isEnabled === 1" [value]="c.code">{{ c.code }} - {{ c.name }}</option>
+              </ng-container>
+            </select>
+          </div>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="serialNumber">Serial Number</label>
-        <input type="text" id="serialNumber" name="serialNumber" [(ngModel)]="newRecord.serialNumber" class="form-control" required [disabled]="!isFormEditable">
+      <!-- Beneficiary Subsection -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #475569;">Beneficiary Details</h4>
+        
+        <div class="form-group">
+          <label for="beneficiaryName">Beneficiary Name</label>
+          <input type="text" id="beneficiaryName" name="beneficiaryName" [(ngModel)]="newRecord.beneficiaryName" class="form-control" required [disabled]="!isFormEditable">
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+          <div class="form-group" style="flex: 1;">
+            <label for="beneficiaryAddressLine1">Address Line 1</label>
+            <input type="text" id="beneficiaryAddressLine1" name="beneficiaryAddressLine1" [(ngModel)]="newRecord.beneficiaryAddressLine1" class="form-control" [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label for="beneficiaryAddressLine2">Address Line 2</label>
+            <input type="text" id="beneficiaryAddressLine2" name="beneficiaryAddressLine2" [(ngModel)]="newRecord.beneficiaryAddressLine2" class="form-control" [disabled]="!isFormEditable">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+          <div class="form-group" style="flex: 2;">
+            <label for="beneficiaryTownName">Town / City</label>
+            <input type="text" id="beneficiaryTownName" name="beneficiaryTownName" [(ngModel)]="newRecord.beneficiaryTownName" class="form-control" [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label for="beneficiaryStateCode">State Code</label>
+            <input type="text" id="beneficiaryStateCode" name="beneficiaryStateCode" [(ngModel)]="newRecord.beneficiaryStateCode" class="form-control" [disabled]="!isFormEditable">
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label for="beneficiaryCountryCode">Country Code</label>
+            <input type="text" id="beneficiaryCountryCode" name="beneficiaryCountryCode" [(ngModel)]="newRecord.beneficiaryCountryCode" class="form-control" [disabled]="!isFormEditable">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="remarks">Remarks / Notes</label>
+          <textarea id="remarks" name="remarks" [(ngModel)]="newRecord.remarks" class="form-control" rows="2" [disabled]="!isFormEditable" style="resize: vertical; max-width: 100%;"></textarea>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="accountNumber">Account Number</label>
-        <input type="text" id="accountNumber" name="accountNumber" [(ngModel)]="newRecord.accountNumber" class="form-control" required [disabled]="!isFormEditable">
-      </div>
-
-      <div class="form-group">
-        <label for="beneficiaryName">Beneficiary Name</label>
-        <input type="text" id="beneficiaryName" name="beneficiaryName" [(ngModel)]="newRecord.beneficiaryName" class="form-control" required [disabled]="!isFormEditable">
-      </div>
-
-      <div class="form-group">
-        <label for="beneficiaryAddress">Beneficiary Address</label>
-        <input type="text" id="beneficiaryAddress" name="beneficiaryAddress" [(ngModel)]="newRecord.beneficiaryAddress" class="form-control" [disabled]="!isFormEditable">
-      </div>
-
-      <div class="form-group">
-        <label for="amountValue">Amount</label>
-        <input type="number" id="amountValue" name="amountValue" [(ngModel)]="newRecord.amount" class="form-control" step="0.01" required [disabled]="!isFormEditable">
-      </div>
 
       <div class="form-actions form-action-buttons">
         <ng-container *ngIf="!isFormEditable">
@@ -266,7 +316,7 @@
 
         <ng-container *ngIf="isFormEditable">
           <button type="button" class="btn-outline" (click)="cancelForm()">Cancel</button>
-          <button type="submit" class="btn-primary" [disabled]="!isFormValid()">Save</button>
+          <button type="submit" class="btn-primary">Save</button>
         </ng-container>
       </div>
     </form>
@@ -326,6 +376,44 @@
     <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
       <button class="btn-outline" (click)="closeBulkModal()">Cancel</button>
       <button class="btn-primary" (click)="confirmBulkAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Account Search Modal -->
+<div class="modal-overlay" *ngIf="showAccountSearchModal" (click)="closeAccountSearchModal()">
+  <div class="modal-content" style="max-width: 600px; padding: 1.5rem;" (click)="$event.stopPropagation()">
+    <div class="form-header-actions" style="margin-bottom: 1rem; border-bottom: none; padding-bottom: 0;">
+      <h3 style="margin: 0; font-size: 1.25rem;">Search Accounts</h3>
+      <button type="button" class="btn-icon" (click)="closeAccountSearchModal()" title="Close">&times;</button>
+    </div>
+    
+    <div class="form-group" style="margin-top: 0.5rem; margin-bottom: 1rem;">
+      <input type="text" class="form-control" placeholder="Search by account number or name..." [(ngModel)]="accountSearchQuery" (input)="filterAccounts()" autofocus>
+    </div>
+
+    <div style="max-height: 400px; overflow-y: auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Account Number</th>
+            <th>Account Name</th>
+            <th style="width: 80px; text-align: center;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let acc of filteredAccounts" class="clickable-row" (click)="selectAccount(acc)">
+            <td style="font-weight: 500;">{{ acc.accountNumber }}</td>
+            <td>{{ acc.accountName }}</td>
+            <td style="text-align: center;">
+              <button type="button" class="btn-primary-small" (click)="selectAccount(acc); $event.stopPropagation()">Select</button>
+            </td>
+          </tr>
+          <tr *ngIf="filteredAccounts.length === 0">
+            <td colspan="3" class="empty-state" style="padding: 2rem; text-align: center; color: #64748b;">No matching accounts found.</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>

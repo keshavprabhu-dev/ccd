@@ -29,7 +29,13 @@ interface IssuanceRecord {
   serialNumber: string;
   accountNumber: string;
   beneficiaryName: string;
-  beneficiaryAddress?: string;
+  beneficiaryAddressLine1?: string;
+  beneficiaryAddressLine2?: string;
+  beneficiaryTownName?: string;
+  beneficiaryStateCode?: string;
+  beneficiaryCountryCode?: string;
+  currencyCode?: string;
+  remarks?: string;
   amount: number;
   // standard audit fields
   createdBy?: string;
@@ -58,6 +64,18 @@ export class IssuanceManagement implements OnInit {
   private app = inject(App);
   private http = inject(HttpClient);
 
+  // Account Search Modal State
+  showAccountSearchModal = false;
+  accountSearchQuery = '';
+  mockAccounts = [
+    { accountNumber: '1000123456', accountName: 'Corporate Checking' },
+    { accountNumber: '1000987654', accountName: 'Payroll Account' },
+    { accountNumber: '2000111222', accountName: 'Vendor Payments' },
+    { accountNumber: '3000555666', accountName: 'Tax Reserve' },
+    { accountNumber: '4000888999', accountName: 'Operations Main' }
+  ];
+  filteredAccounts = [...this.mockAccounts];
+
   get currentUser(): string {
     const user = this.app.currentUser();
     return user ? user.username : 'System User';
@@ -65,11 +83,24 @@ export class IssuanceManagement implements OnInit {
 
   allRecords: IssuanceRecord[] = [];
   filteredRecords: IssuanceRecord[] = [];
+  availableCurrencies: any[] = [];
   isLoading: boolean = false;
   showFormModal: boolean = false;
 
   ngOnInit() {
     this.loadFromApi();
+    this.loadCurrencies();
+  }
+
+  loadCurrencies() {
+    this.http.get<any[]>('http://localhost:3000/api/currencies').subscribe({
+      next: (data) => {
+        this.availableCurrencies = data;
+      },
+      error: (err) => {
+        console.error('Failed to load currencies', err);
+      }
+    });
   }
 
   // ── API helpers ────────────────────────────────────────────────────────────
@@ -232,7 +263,13 @@ export class IssuanceManagement implements OnInit {
       serialNumber: '',
       accountNumber: '',
       beneficiaryName: '',
-      beneficiaryAddress: '',
+      beneficiaryAddressLine1: '',
+      beneficiaryAddressLine2: '',
+      beneficiaryTownName: '',
+      beneficiaryStateCode: '',
+      beneficiaryCountryCode: '',
+      currencyCode: 'USD',
+      remarks: '',
       amount: 0,
       createdBy: '',
       createdTimestamp: '',
@@ -379,7 +416,7 @@ export class IssuanceManagement implements OnInit {
               serialNumber: serialNumber,
               accountNumber: accountNumber,
               beneficiaryName: parts[3]?.trim() || '',
-              beneficiaryAddress: parts[4]?.trim() || '',
+              beneficiaryAddressLine1: parts[4]?.trim() || '',
               amount: parseFloat(parts[5]) || parseFloat(parts[4]) || 0, // Fallback for old CSVs
               createdBy: this.currentUser,
               createdTimestamp: new Date().toISOString(),
@@ -459,7 +496,7 @@ export class IssuanceManagement implements OnInit {
       const matchSerial = record.serialNumber.toLowerCase().includes(this.filters.serialNumber.toLowerCase());
       const matchAccount = record.accountNumber.toLowerCase().includes(this.filters.accountNumber.toLowerCase());
       const matchBeneficiary = record.beneficiaryName.toLowerCase().includes(this.filters.beneficiaryName.toLowerCase());
-      const matchAddress = record.beneficiaryAddress ? record.beneficiaryAddress.toLowerCase().includes(this.filters.beneficiaryAddress.toLowerCase()) : true;
+      const matchAddress = record.beneficiaryAddressLine1 ? record.beneficiaryAddressLine1.toLowerCase().includes(this.filters.beneficiaryAddress.toLowerCase()) : true;
       const matchAmount = this.filters.amount ? record.amount.toString().includes(this.filters.amount) : true;
       
       return matchDate && matchSerial && matchAccount && matchBeneficiary && matchAddress && matchAmount;
@@ -482,10 +519,11 @@ export class IssuanceManagement implements OnInit {
 
   isFormValid(): boolean {
     return (
-      this.newRecord.date.trim() !== '' &&
-      this.newRecord.serialNumber.trim() !== '' &&
-      this.newRecord.accountNumber.trim() !== '' &&
-      this.newRecord.beneficiaryName.trim() !== '' &&
+      (this.newRecord.date || '').trim() !== '' &&
+      (this.newRecord.serialNumber || '').trim() !== '' &&
+      (this.newRecord.accountNumber || '').trim() !== '' &&
+      (this.newRecord.currencyCode || '').trim() !== '' &&
+      this.newRecord.amount !== null &&
       this.newRecord.amount > 0
     );
   }
@@ -533,7 +571,7 @@ export class IssuanceManagement implements OnInit {
 
     const csvLines = this.filteredRecords.map(r => {
       return [
-        r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress || '', r.amount,
+        r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddressLine1 || '', r.amount,
         r.createdBy || '', r.createdTimestamp || '', r.modifiedBy || '',
         r.modifiedTimestamp || '', r.approvedBy || '', r.approvedTimestamp || '',
         r.modifiedCount || 0, r.recordStatus || ''
@@ -913,8 +951,12 @@ export class IssuanceManagement implements OnInit {
   }
 
   submitForm() {
-    if (this.isFormValid()) {
-      const now = new Date().toISOString();
+    if (!this.isFormValid()) {
+      alert("Please fill out all mandatory Check Details fields:\n\n- Account Number\n- Serial Number\n- Issued Date\n- Amount\n- Currency");
+      return;
+    }
+
+    const now = new Date().toISOString();
       this.newRecord.modifiedBy = this.currentUser;
       
       if (this.selectedRecord) {
@@ -954,6 +996,33 @@ export class IssuanceManagement implements OnInit {
       }
       this.applyFilters();
       this.isFormEditable = false;
+  }
+
+  // Account Search Methods
+  openAccountSearch() {
+    this.showAccountSearchModal = true;
+    this.accountSearchQuery = this.newRecord.accountNumber || '';
+    this.filterAccounts();
+  }
+
+  closeAccountSearchModal() {
+    this.showAccountSearchModal = false;
+  }
+
+  filterAccounts() {
+    if (!this.accountSearchQuery) {
+      this.filteredAccounts = [...this.mockAccounts];
+    } else {
+      const q = this.accountSearchQuery.toLowerCase();
+      this.filteredAccounts = this.mockAccounts.filter(a => 
+        a.accountNumber.toLowerCase().includes(q) || 
+        a.accountName.toLowerCase().includes(q)
+      );
     }
+  }
+
+  selectAccount(acc: any) {
+    this.newRecord.accountNumber = acc.accountNumber;
+    this.closeAccountSearchModal();
   }
 }
