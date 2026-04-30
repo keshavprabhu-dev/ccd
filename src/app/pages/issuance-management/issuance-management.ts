@@ -86,6 +86,8 @@ export class IssuanceManagement implements OnInit {
   availableCurrencies: any[] = [];
   isLoading: boolean = false;
   showFormModal: boolean = false;
+  showErrorModal: boolean = false;
+  errorMessage: string = '';
 
   ngOnInit() {
     this.loadFromApi();
@@ -213,22 +215,59 @@ export class IssuanceManagement implements OnInit {
   currentPage: number = 1;
   pageSize: number = 10;
   
-  // Filters
   filters = {
     date: '',
     serialNumber: '',
     accountNumber: '',
     beneficiaryName: '',
     beneficiaryAddress: '',
-    amount: ''
+    amount: '',
+    currencyCode: '',
+    createdBy: '',
+    createdTimestamp: '',
+    modifiedBy: '',
+    modifiedTimestamp: '',
+    approvedBy: '',
+    approvedTimestamp: '',
+    modifiedCount: '',
+    recordStatus: ''
   };
+
+  sortColumn: string = '';
+  sortDirection: 'asc' | 'desc' = 'asc';
+
+  toggleSort(column: string) {
+    if (this.sortColumn === column) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumn = column;
+      this.sortDirection = 'asc';
+    }
+    this.applyFilters();
+  }
 
   showFilters: boolean = false;
 
   toggleFilters() {
     this.showFilters = !this.showFilters;
     if (!this.showFilters) {
-      this.filters = { date: '', serialNumber: '', accountNumber: '', beneficiaryName: '', beneficiaryAddress: '', amount: '' };
+      this.filters = {
+        date: '',
+        serialNumber: '',
+        accountNumber: '',
+        beneficiaryName: '',
+        beneficiaryAddress: '',
+        amount: '',
+        currencyCode: '',
+        createdBy: '',
+        createdTimestamp: '',
+        modifiedBy: '',
+        modifiedTimestamp: '',
+        approvedBy: '',
+        approvedTimestamp: '',
+        modifiedCount: '',
+        recordStatus: ''
+      };
       this.applyFilters();
     }
   }
@@ -241,6 +280,7 @@ export class IssuanceManagement implements OnInit {
     beneficiaryName: true,
     beneficiaryAddress: false,
     amount: true,
+    currencyCode: true,
     createdBy: false,
     createdTimestamp: false,
     modifiedBy: false,
@@ -498,9 +538,35 @@ export class IssuanceManagement implements OnInit {
       const matchBeneficiary = record.beneficiaryName.toLowerCase().includes(this.filters.beneficiaryName.toLowerCase());
       const matchAddress = record.beneficiaryAddressLine1 ? record.beneficiaryAddressLine1.toLowerCase().includes(this.filters.beneficiaryAddress.toLowerCase()) : true;
       const matchAmount = this.filters.amount ? record.amount.toString().includes(this.filters.amount) : true;
+      const matchCurrency = record.currencyCode?.toLowerCase().includes(this.filters.currencyCode.toLowerCase());
+      const matchCreatedBy = record.createdBy?.toLowerCase().includes(this.filters.createdBy.toLowerCase());
+      const matchCreatedDate = record.createdTimestamp?.includes(this.filters.createdTimestamp);
+      const matchModifiedBy = record.modifiedBy?.toLowerCase().includes(this.filters.modifiedBy.toLowerCase());
+      const matchModifiedDate = record.modifiedTimestamp?.includes(this.filters.modifiedTimestamp);
+      const matchApprovedBy = record.approvedBy?.toLowerCase().includes(this.filters.approvedBy.toLowerCase());
+      const matchApprovedDate = record.approvedTimestamp?.includes(this.filters.approvedTimestamp);
+      const matchModCount = this.filters.modifiedCount ? record.modifiedCount?.toString().includes(this.filters.modifiedCount) : true;
+      const matchStatus = record.recordStatus?.toLowerCase().includes(this.filters.recordStatus.toLowerCase());
       
-      return matchDate && matchSerial && matchAccount && matchBeneficiary && matchAddress && matchAmount;
+      return matchDate && matchSerial && matchAccount && matchBeneficiary && matchAddress && matchAmount && matchCurrency && matchCreatedBy && matchCreatedDate && matchModifiedBy && matchModifiedDate && matchApprovedBy && matchApprovedDate && matchModCount && matchStatus;
     });
+
+    if (this.sortColumn) {
+      this.filteredRecords.sort((a: any, b: any) => {
+        let valA = a[this.sortColumn];
+        let valB = b[this.sortColumn];
+
+        if (valA === undefined || valA === null) valA = '';
+        if (valB === undefined || valB === null) valB = '';
+
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+
+        if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
     // Reset to first page whenever filters change
     this.currentPage = 1;
   }
@@ -952,7 +1018,8 @@ export class IssuanceManagement implements OnInit {
 
   submitForm() {
     if (!this.isFormValid()) {
-      alert("Please fill out all mandatory Check Details fields:\n\n- Account Number\n- Serial Number\n- Issued Date\n- Amount\n- Currency");
+      this.errorMessage = "Please fill out all mandatory Check Details fields:\n\n- Account Number\n- Serial Number\n- Issued Date\n- Amount\n- Currency";
+      this.showErrorModal = true;
       return;
     }
 
@@ -1024,5 +1091,10 @@ export class IssuanceManagement implements OnInit {
   selectAccount(acc: any) {
     this.newRecord.accountNumber = acc.accountNumber;
     this.closeAccountSearchModal();
+  }
+
+  closeErrorModal() {
+    this.showErrorModal = false;
+    this.errorMessage = '';
   }
 }

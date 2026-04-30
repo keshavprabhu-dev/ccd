@@ -116,7 +116,8 @@
               <td>{{ r.serialNumber }}</td>
               <td>{{ r.date }}</td>
               <td>{{ r.beneficiaryName }}</td>
-              <td>{{ formatAmount(r.amount) }}</td>
+              <td>{{ formatAmount(r.amount, r.currencyCode) }}</td>
+              <td>{{ r.currencyCode }}</td>
               <td class="reason-cell">{{ r.reason }}</td>
               <td>
                 <span class="status-badge" [ngClass]="getStatusClass(r.status)">{{ r.status }}</span>
@@ -143,7 +144,7 @@
 </div>
 
 <!-- Stop Payment Form Modal -->
-<div class="modal-overlay" *ngIf="showFormModal" (click)="closeFormModal()">
+<div class="modal-overlay" *ngIf="showFormModal">
   <div class="modal-content" (click)="$event.stopPropagation()">
     <div class="form-header-actions" style="margin-bottom: 1.5rem;">
       <h3 style="margin-bottom: 0;">{{ selectedRecord ? 'Stop Payment Details' : 'New Stop Payment Request' }}</h3>
@@ -186,7 +187,7 @@
               [(ngModel)]="newRecord.serialNumber" [disabled]="!isFormEditable">
           </div>
           <div class="form-group" style="flex: 1; margin-bottom: 0;">
-            <label for="f-date">Date</label>
+            <label for="f-date">Date <span class="required">*</span></label>
             <input id="f-date" name="f-date" type="date" class="form-control"
               [(ngModel)]="newRecord.date" [disabled]="!isFormEditable">
           </div>
@@ -194,13 +195,18 @@
 
         <div style="display: flex; gap: 1rem; margin-bottom: 0;">
           <div class="form-group" style="flex: 2; margin-bottom: 0;">
-            <label for="f-amount">Amount</label>
+            <label for="f-amount">Amount <span class="required">*</span></label>
             <input id="f-amount" name="f-amount" type="number" class="form-control" placeholder="0.00" min="0" step="0.01"
               [(ngModel)]="newRecord.amount" [disabled]="!isFormEditable">
           </div>
           <div class="form-group" style="flex: 1; margin-bottom: 0;">
-            <label for="f-currencyCode">Currency Code</label>
-            <input type="text" id="f-currencyCode" name="f-currencyCode" [(ngModel)]="newRecord.currencyCode" class="form-control" [disabled]="!isFormEditable">
+            <label for="f-currencyCode">Currency <span class="required">*</span></label>
+            <select id="f-currencyCode" name="f-currencyCode" [(ngModel)]="newRecord.currencyCode" class="form-control" [disabled]="!isFormEditable">
+              <option value="" disabled selected>Select...</option>
+              <ng-container *ngFor="let c of availableCurrencies">
+                <option *ngIf="c.isEnabled === 1" [value]="c.code">{{ c.code }} - {{ c.name }}</option>
+              </ng-container>
+            </select>
           </div>
         </div>
       </div>
@@ -256,21 +262,20 @@
         </select>
       </div>
 
-      <div class="form-actions">
-        <div class="form-action-buttons">
-          <ng-container *ngIf="isFormEditable">
-            <button type="button" class="btn-secondary" (click)="cancelEdit()">Cancel</button>
-            <button type="button" class="btn-primary" [disabled]="!isFormValid() || isSaving" (click)="submitForm()">
-              <span *ngIf="!isSaving">Save Changes</span>
-              <span *ngIf="isSaving" class="flex-center"><span class="loader-spinner"></span>&nbsp;Saving…</span>
-            </button>
-          </ng-container>
-        </div>
-      </div>
     </form>
 
+    <div class="form-actions form-action-buttons" style="margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
+      <ng-container *ngIf="isFormEditable">
+        <button type="button" class="btn-secondary" (click)="cancelEdit()">Cancel</button>
+        <button type="button" class="btn-primary" [disabled]="!isFormValid() || isSaving" (click)="submitForm()">
+          <span *ngIf="!isSaving">Save Changes</span>
+          <span *ngIf="isSaving" class="flex-center"><span class="loader-spinner"></span>&nbsp;Saving…</span>
+        </button>
+      </ng-container>
+    </div>
+
     <!-- Audit Trail Footer -->
-    <div style="margin: 2rem -2rem -2rem -2rem; background: var(--navy-blue); padding: 1.25rem 2rem; border-radius: 0 0 12px 12px; pointer-events: none; border-top: 1px solid var(--navy-blue-dark); flex-shrink: 0;">
+    <div style="background: var(--navy-blue); border: 1px solid var(--navy-blue-dark); padding: 1.25rem; border-radius: 6px; margin-top: 1.5rem; pointer-events: none; flex-shrink: 0;">
       <h4 style="font-size: 0.85rem; color: #f8fafc; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.2); padding-bottom: 0.5rem; margin-top: 0; font-weight: 600;">Audit Trail</h4>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; font-size: 0.75rem;">
         <div><strong style="color: #94a3b8;">Created By:</strong> <span style="color: #ffffff;">{{ newRecord.createdBy || '' }}</span></div>
@@ -390,5 +395,18 @@
       </div>
       <button type="submit" class="btn-primary" style="margin-top: 1rem; background: #ef4444; border-color: #ef4444;">Remove Ranged Stop</button>
     </form>
+  </div>
+</div>
+<!-- Error Message Modal -->
+<div class="modal-overlay" *ngIf="showErrorModal" style="z-index: 2000;">
+  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 500px; text-align: center; padding: 2.5rem;">
+    <div style="color: #ef4444; margin-bottom: 1.5rem;">
+      <svg width="64" height="64" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto;">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+    </div>
+    <h3 style="color: #1e293b; margin-bottom: 1rem;">Validation Error</h3>
+    <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem; white-space: pre-wrap; text-align: left;">{{ errorMessage }}</p>
+    <button type="button" class="btn-primary" (click)="closeErrorModal()">Go Back and Fix</button>
   </div>
 </div>

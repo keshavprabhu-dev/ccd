@@ -537,7 +537,7 @@
 
 .modal-content {
   background: white;
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: 12px;
   width: 90%;
   max-width: 1000px;
@@ -629,4 +629,24 @@
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+.sortable-header {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.sortable-header:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.sort-icon {
+  margin-left: 0.5rem;
+  font-weight: bold;
+  color: var(--navy-blue);
+}
+
+.th-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }

@@ -62,10 +62,13 @@ export class StopPayments implements OnInit {
   // ── State ──────────────────────────────────────────────────────────────────
   allRecords: StopPayment[] = [];
   filteredRecords: StopPayment[] = [];
+  availableCurrencies: any[] = [];
   isLoading = false;
   isSaving = false;
   toastMessage: string | null = null;
   showFormModal = false;
+  showErrorModal = false;
+  errorMessage = '';
 
   // ── Pagination ──────────────────────────────────────────────────────────────
   currentPage = 1;
@@ -155,6 +158,18 @@ export class StopPayments implements OnInit {
   // ── Load All ──────────────────────────────────────────────────────────────
   ngOnInit() {
     this.loadAll();
+    this.loadCurrencies();
+  }
+
+  loadCurrencies() {
+    this.http.get<any[]>('http://localhost:3000/api/currencies').subscribe({
+      next: (data) => {
+        this.availableCurrencies = data;
+      },
+      error: (err) => {
+        console.error('Failed to load currencies', err);
+      }
+    });
   }
 
   loadAll() {
@@ -377,8 +392,8 @@ export class StopPayments implements OnInit {
   submitForm() {
     console.log('Submitting Stop Payment:', this.newRecord);
     if (!this.isFormValid()) {
-      console.warn('Form validation failed:', this.newRecord);
-      this.showToast('⚠️ Please fill out all required fields correctly.');
+      this.errorMessage = "Please fill out all mandatory fields:\n\n- Account Number\n- Serial Number\n- Date\n- Amount\n- Currency";
+      this.showErrorModal = true;
       return;
     }
     this.isSaving = true;
@@ -477,7 +492,12 @@ export class StopPayments implements OnInit {
     setTimeout(() => { this.toastMessage = null; this.cdr.detectChanges(); }, 3500);
   }
 
-  formatAmount(v: number): string {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+  formatAmount(v: number, currency: string = 'USD'): string {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(v);
+  }
+
+  closeErrorModal() {
+    this.showErrorModal = false;
+    this.errorMessage = '';
   }
 }

@@ -65,38 +65,66 @@
               <th class="checkbox-cell">
                 <input type="checkbox" (change)="toggleAllSelection($event)">
               </th>
-              <th *ngIf="columns.date">
-                <div class="th-content">Issued Date</div>
-                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.date" (ngModelChange)="applyFilters()" class="filter-input" placeholder="YYYY-MM-DD">
+              <th *ngIf="columns.date" (click)="toggleSort('date')" class="sortable-header">
+                <div class="th-content">Issued Date <span class="sort-icon" *ngIf="sortColumn === 'date'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.date" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="YYYY-MM-DD">
               </th>
-              <th *ngIf="columns.serialNumber">
-                <div class="th-content">Serial Number</div>
-                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.serialNumber" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Serial">
+              <th *ngIf="columns.serialNumber" (click)="toggleSort('serialNumber')" class="sortable-header">
+                <div class="th-content">Serial Number <span class="sort-icon" *ngIf="sortColumn === 'serialNumber'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.serialNumber" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Serial">
               </th>
-              <th *ngIf="columns.accountNumber">
-                <div class="th-content">Account Number</div>
-                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.accountNumber" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Account">
+              <th *ngIf="columns.accountNumber" (click)="toggleSort('accountNumber')" class="sortable-header">
+                <div class="th-content">Account Number <span class="sort-icon" *ngIf="sortColumn === 'accountNumber'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.accountNumber" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Account">
               </th>
-              <th *ngIf="columns.beneficiaryName">
-                <div class="th-content">Beneficiary Name</div>
-                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.beneficiaryName" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Beneficiary">
+              <th *ngIf="columns.beneficiaryName" (click)="toggleSort('beneficiaryName')" class="sortable-header">
+                <div class="th-content">Beneficiary Name <span class="sort-icon" *ngIf="sortColumn === 'beneficiaryName'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.beneficiaryName" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Beneficiary">
               </th>
-              <th *ngIf="columns.beneficiaryAddress">
-                <div class="th-content">Beneficiary Address</div>
-                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.beneficiaryAddress" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Address">
+              <th *ngIf="columns.beneficiaryAddress" (click)="toggleSort('beneficiaryAddressLine1')" class="sortable-header">
+                <div class="th-content">Beneficiary Address <span class="sort-icon" *ngIf="sortColumn === 'beneficiaryAddressLine1'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.beneficiaryAddress" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Address">
               </th>
-              <th *ngIf="columns.amount">
-                <div class="th-content">Amount</div>
-                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.amount" (ngModelChange)="applyFilters()" class="filter-input" placeholder="Search Amount">
+              <th *ngIf="columns.amount" (click)="toggleSort('amount')" class="sortable-header">
+                <div class="th-content">Amount <span class="sort-icon" *ngIf="sortColumn === 'amount'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.amount" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Amount">
               </th>
-              <th *ngIf="columns.createdBy"><div class="th-content">Created By</div></th>
-              <th *ngIf="columns.createdTimestamp"><div class="th-content">Created Date</div></th>
-              <th *ngIf="columns.modifiedBy"><div class="th-content">Modified By</div></th>
-              <th *ngIf="columns.modifiedTimestamp"><div class="th-content">Modified Date</div></th>
-              <th *ngIf="columns.approvedBy"><div class="th-content">Approved By</div></th>
-              <th *ngIf="columns.approvedTimestamp"><div class="th-content">Approved Date</div></th>
-              <th *ngIf="columns.modifiedCount"><div class="th-content">Mod. Count</div></th>
-              <th><div class="th-content">Status</div></th>
+              <th *ngIf="columns.currencyCode" (click)="toggleSort('currencyCode')" class="sortable-header">
+                <div class="th-content">Currency <span class="sort-icon" *ngIf="sortColumn === 'currencyCode'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.currencyCode" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Currency">
+              </th>
+              <th *ngIf="columns.createdBy" (click)="toggleSort('createdBy')" class="sortable-header">
+                <div class="th-content">Created By <span class="sort-icon" *ngIf="sortColumn === 'createdBy'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.createdBy" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Creator">
+              </th>
+              <th *ngIf="columns.createdTimestamp" (click)="toggleSort('createdTimestamp')" class="sortable-header">
+                <div class="th-content">Created Date <span class="sort-icon" *ngIf="sortColumn === 'createdTimestamp'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.createdTimestamp" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Date">
+              </th>
+              <th *ngIf="columns.modifiedBy" (click)="toggleSort('modifiedBy')" class="sortable-header">
+                <div class="th-content">Modified By <span class="sort-icon" *ngIf="sortColumn === 'modifiedBy'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.modifiedBy" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Modifier">
+              </th>
+              <th *ngIf="columns.modifiedTimestamp" (click)="toggleSort('modifiedTimestamp')" class="sortable-header">
+                <div class="th-content">Modified Date <span class="sort-icon" *ngIf="sortColumn === 'modifiedTimestamp'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.modifiedTimestamp" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Date">
+              </th>
+              <th *ngIf="columns.approvedBy" (click)="toggleSort('approvedBy')" class="sortable-header">
+                <div class="th-content">Approved By <span class="sort-icon" *ngIf="sortColumn === 'approvedBy'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.approvedBy" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Approver">
+              </th>
+              <th *ngIf="columns.approvedTimestamp" (click)="toggleSort('approvedTimestamp')" class="sortable-header">
+                <div class="th-content">Approved Date <span class="sort-icon" *ngIf="sortColumn === 'approvedTimestamp'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.approvedTimestamp" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Date">
+              </th>
+              <th *ngIf="columns.modifiedCount" (click)="toggleSort('modifiedCount')" class="sortable-header">
+                <div class="th-content">Mod. Count <span class="sort-icon" *ngIf="sortColumn === 'modifiedCount'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.modifiedCount" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Count">
+              </th>
+              <th (click)="toggleSort('recordStatus')" class="sortable-header">
+                <div class="th-content">Status <span class="sort-icon" *ngIf="sortColumn === 'recordStatus'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
+                <input *ngIf="showFilters" type="text" [(ngModel)]="filters.recordStatus" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Status">
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -113,6 +141,7 @@
               <td *ngIf="columns.beneficiaryName">{{ record.beneficiaryName }}</td>
               <td *ngIf="columns.beneficiaryAddress">{{ record.beneficiaryAddressLine1 }}</td>
               <td *ngIf="columns.amount">{{ record.amount | number:'1.2-2' }}</td>
+              <td *ngIf="columns.currencyCode">{{ record.currencyCode }}</td>
               <td *ngIf="columns.createdBy">{{ record.createdBy }}</td>
               <td *ngIf="columns.createdTimestamp">{{ record.createdTimestamp | date:'short' }}</td>
               <td *ngIf="columns.modifiedBy">{{ record.modifiedBy }}</td>
@@ -198,7 +227,7 @@
 </div>
 
 <!-- Issuance Form Modal -->
-<div class="modal-overlay" *ngIf="showFormModal" (click)="closeFormModal()">
+<div class="modal-overlay" *ngIf="showFormModal">
   <div class="modal-content" (click)="$event.stopPropagation()">
     <div class="form-header-actions" style="margin-bottom: 1.5rem;">
       <h3 style="margin-bottom: 0;">{{ selectedRecord ? 'Edit Issuance Record' : 'New Issuance Record' }}</h3>
@@ -207,7 +236,9 @@
 
         <!-- Unlock Button -->
         <button type="button" class="btn-icon" *ngIf="selectedRecord && !isFormEditable && ['IMPORTED', 'NEW', 'APPROVED', 'ISSUED'].includes(selectedRecord.recordStatus || '')" (click)="unlockForm()" title="Unlock Form" aria-label="Unlock Form">
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m4 4v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+          </svg>
         </button>
         <!-- Delete Button -->
         <button type="button" class="btn-icon btn-icon-danger" style="color: #ef4444;" *ngIf="selectedRecord" (click)="deleteRecord()" title="Delete Record" aria-label="Delete Record">
@@ -226,7 +257,7 @@
         
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
           <div class="form-group" style="flex: 1; margin-bottom: 0;">
-            <label for="accountNumber">Account Number</label>
+            <label for="accountNumber">Account Number <span class="required">*</span></label>
             <div style="display: flex; gap: 0.5rem;">
               <input type="text" id="accountNumber" name="accountNumber" [(ngModel)]="newRecord.accountNumber" class="form-control" required [disabled]="!isFormEditable">
               <button type="button" class="btn-outline-small" (click)="openAccountSearch()" [disabled]="!isFormEditable" style="height: 38px;">
@@ -235,22 +266,22 @@
             </div>
           </div>
           <div class="form-group" style="flex: 1; margin-bottom: 0;">
-            <label for="serialNumber">Serial Number</label>
+            <label for="serialNumber">Serial Number <span class="required">*</span></label>
             <input type="text" id="serialNumber" name="serialNumber" [(ngModel)]="newRecord.serialNumber" class="form-control" required [disabled]="!isFormEditable">
           </div>
           <div class="form-group" style="flex: 1; margin-bottom: 0;">
-            <label for="issuedDate">Issued Date</label>
+            <label for="issuedDate">Issued Date <span class="required">*</span></label>
             <input type="date" id="issuedDate" name="issuedDate" [(ngModel)]="newRecord.date" class="form-control" required [disabled]="!isFormEditable">
           </div>
         </div>
 
         <div style="display: flex; gap: 1rem; margin-bottom: 0;">
           <div class="form-group" style="flex: 2; margin-bottom: 0;">
-            <label for="amount">Amount</label>
-            <input type="number" id="amount" name="amount" [(ngModel)]="newRecord.amount" class="form-control" required [disabled]="!isFormEditable">
+            <label for="amount">Amount <span class="required">*</span></label>
+            <input type="number" id="amount" name="amount" [(ngModel)]="newRecord.amount" class="form-control" required [disabled]="!isFormEditable" step="0.01">
           </div>
           <div class="form-group" style="flex: 1; margin-bottom: 0;">
-            <label for="currencyCode">Currency</label>
+            <label for="currencyCode">Currency <span class="required">*</span></label>
             <select id="currencyCode" name="currencyCode" [(ngModel)]="newRecord.currencyCode" class="form-control" [disabled]="!isFormEditable">
               <option value="" disabled selected>Select...</option>
               <ng-container *ngFor="let c of availableCurrencies">
@@ -301,27 +332,26 @@
           <textarea id="remarks" name="remarks" [(ngModel)]="newRecord.remarks" class="form-control" rows="2" [disabled]="!isFormEditable" style="resize: vertical; max-width: 100%;"></textarea>
         </div>
       </div>
-
-
-      <div class="form-actions form-action-buttons">
-        <ng-container *ngIf="!isFormEditable">
-          <ng-container *ngIf="selectedRecord && availableActions.length > 0">
-            <select [(ngModel)]="selectedAction" [ngModelOptions]="{standalone: true}" class="form-control" style="width: auto; min-width: 150px; display: inline-block; margin-left: auto;">
-              <option value="" disabled selected>Select decision...</option>
-              <option *ngFor="let act of availableActions" [value]="act">{{ act }}</option>
-            </select>
-            <button type="button" class="btn-primary" [disabled]="!selectedAction" (click)="executeDecision()">Apply Decision</button>
-          </ng-container>
-        </ng-container>
-
-        <ng-container *ngIf="isFormEditable">
-          <button type="button" class="btn-outline" (click)="cancelForm()">Cancel</button>
-          <button type="submit" class="btn-primary">Save</button>
-        </ng-container>
-      </div>
     </form>
+
+    <div class="form-actions form-action-buttons" style="margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
+      <ng-container *ngIf="!isFormEditable">
+        <ng-container *ngIf="selectedRecord && availableActions.length > 0">
+          <select [(ngModel)]="selectedAction" [ngModelOptions]="{standalone: true}" class="form-control" style="width: auto; min-width: 150px; display: inline-block; margin-left: auto;">
+            <option value="" disabled selected>Select decision...</option>
+            <option *ngFor="let act of availableActions" [value]="act">{{ act }}</option>
+          </select>
+          <button type="button" class="btn-primary" [disabled]="!selectedAction" (click)="executeDecision()">Apply Decision</button>
+        </ng-container>
+      </ng-container>
+
+      <ng-container *ngIf="isFormEditable">
+        <button type="button" class="btn-outline" (click)="cancelForm()">Cancel</button>
+        <button type="button" class="btn-primary" (click)="submitForm()">Save</button>
+      </ng-container>
+    </div>
     
-    <div style="margin: 2rem -2rem -2rem -2rem; background: var(--navy-blue); padding: 1rem 2rem; border-radius: 0 0 12px 12px; pointer-events: none; border-top: 1px solid var(--navy-blue-dark); flex-shrink: 0;">
+    <div style="background: var(--navy-blue); border: 1px solid var(--navy-blue-dark); padding: 1rem 1.5rem; border-radius: 6px; margin-top: 1.5rem; pointer-events: none; flex-shrink: 0;">
       <h4 style="font-size: 0.8rem; color: #f8fafc; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.2); padding-bottom: 0.5rem; margin-top: 0;">Audit Trail</h4>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; font-size: 0.7rem;">
         <div><strong style="color: #94a3b8;">Created By:</strong> <span style="color: #ffffff;">{{ newRecord.createdBy || '' }}</span></div>
@@ -381,7 +411,7 @@
 </div>
 
 <!-- Account Search Modal -->
-<div class="modal-overlay" *ngIf="showAccountSearchModal" (click)="closeAccountSearchModal()">
+<div class="modal-overlay" *ngIf="showAccountSearchModal">
   <div class="modal-content" style="max-width: 600px; padding: 1.5rem;" (click)="$event.stopPropagation()">
     <div class="form-header-actions" style="margin-bottom: 1rem; border-bottom: none; padding-bottom: 0;">
       <h3 style="margin: 0; font-size: 1.25rem;">Search Accounts</h3>
@@ -415,5 +445,18 @@
         </tbody>
       </table>
     </div>
+  </div>
+</div>
+<!-- Error Message Modal -->
+<div class="modal-overlay" *ngIf="showErrorModal" style="z-index: 2000;">
+  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 500px; text-align: center; padding: 2.5rem;">
+    <div style="color: #ef4444; margin-bottom: 1.5rem;">
+      <svg width="64" height="64" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto;">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+    </div>
+    <h3 style="color: #1e293b; margin-bottom: 1rem;">Validation Error</h3>
+    <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem; white-space: pre-wrap; text-align: left;">{{ errorMessage }}</p>
+    <button type="button" class="btn-primary" (click)="closeErrorModal()">Go Back and Fix</button>
   </div>
 </div>
