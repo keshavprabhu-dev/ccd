@@ -70,12 +70,24 @@
       <div class="main-body">
         <aside class="sidebar" [class.open]="isSidebarOpen()">
           <nav class="sidebar-nav">
-            <a routerLink="/dashboard" routerLinkActive="active" (click)="closeSidebar()">Dashboard</a>
-            <a routerLink="/issuance-management" routerLinkActive="active" (click)="closeSidebar()">Issuance Management</a>
-            <a routerLink="/check-processing" routerLinkActive="active" (click)="closeSidebar()">Check Processing</a>
-            <a routerLink="/stop-payments" routerLinkActive="active" (click)="closeSidebar()">Stop Payments</a>
-            <a routerLink="/icl-parser" routerLinkActive="active" (click)="closeSidebar()">ICL Parser</a>
-            <a routerLink="/administration" routerLinkActive="active" (click)="closeSidebar()">Administration</a>
+            <a routerLink="/dashboard" routerLinkActive="active" (click)="closeSidebar()">
+              Dashboard
+            </a>
+            <a *ngIf="isCorporate" routerLink="/issuance-management" routerLinkActive="active" (click)="closeSidebar()">
+              Issuance Management
+            </a>
+            <a *ngIf="isCorporate" routerLink="/stop-payments" routerLinkActive="active" (click)="closeSidebar()">
+              Stop Payments
+            </a>
+            <a *ngIf="isBankOps" routerLink="/check-processing" routerLinkActive="active" (click)="closeSidebar()" style="display: flex; justify-content: space-between; align-items: center;">
+              Check Processing
+            </a>
+            <a *ngIf="isBankOps" routerLink="/icl-parser" routerLinkActive="active" (click)="closeSidebar()">
+              ICL Parser
+            </a>
+            <a *ngIf="isAdmin" routerLink="/administration" routerLinkActive="active" (click)="closeSidebar()">
+              Administration
+            </a>
           </nav>
         </aside>
 

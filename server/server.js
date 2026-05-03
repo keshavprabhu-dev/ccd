@@ -6,6 +6,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 const { parseX9Buffer } = require('./x9-parser');
+const { matchFile, rematchItem } = require('./matching-engine');
 
 const app = express();
 app.use(helmet({ crossOriginResourcePolicy: false })); // Allowed for static images locally
@@ -140,7 +141,104 @@ issuanceDb.serialize(() => {
       approvedBy TEXT,
       approvedTimestamp TEXT,
       approvalStatus TEXT,
-      modifiedCount INTEGER
+      modifiedCount INTEGER,
+      iclItemId TEXT,
+      matchStatus TEXT DEFAULT 'UNMATCHED'
+    )
+  `);
+
+  // Add matchStatus column if upgrading existing DB
+  issuanceDb.run("ALTER TABLE check_payments ADD COLUMN iclItemId TEXT", () => {});
+  issuanceDb.run("ALTER TABLE check_payments ADD COLUMN matchStatus TEXT DEFAULT 'UNMATCHED'", () => {});
+
+  issuanceDb.run(`
+    CREATE TABLE IF NOT EXISTS icl_items (
+      id TEXT PRIMARY KEY,
+      iclFileId TEXT,
+      checkNumber TEXT,
+      amount REAL,
+      routingNumber TEXT,
+      accountNumber TEXT,
+      carAmount REAL,
+      larAmount REAL,
+      imageFrontPath TEXT,
+      imageBackPath TEXT,
+      parsingStatus TEXT DEFAULT 'PARSED',
+      effectiveCheckNumber TEXT,
+      effectiveAmount REAL,
+      linkedPaymentId TEXT,
+      createdBy TEXT,
+      createdTimestamp TEXT,
+      modifiedBy TEXT,
+      modifiedTimestamp TEXT,
+      modifiedCount INTEGER DEFAULT 0,
+      approvedBy TEXT,
+      approvedTimestamp TEXT,
+      approvalStatus TEXT DEFAULT 'UNAUTHORIZED',
+      recordStatus TEXT DEFAULT 'ACTIVE',
+      sourceSystem TEXT
+    )
+  `);
+
+  issuanceDb.run(`
+    CREATE TABLE IF NOT EXISTS check_exceptions (
+      id TEXT PRIMARY KEY,
+      paymentId TEXT,
+      iclItemId TEXT,
+      exceptionType TEXT,
+      severity TEXT,
+      status TEXT DEFAULT 'OPEN',
+      resolutionNotes TEXT,
+      resolvedBy TEXT,
+      resolvedTimestamp TEXT,
+      createdBy TEXT,
+      createdTimestamp TEXT,
+      modifiedBy TEXT,
+      modifiedTimestamp TEXT,
+      modifiedCount INTEGER DEFAULT 0,
+      approvedBy TEXT,
+      approvedTimestamp TEXT,
+      approvalStatus TEXT DEFAULT 'UNAUTHORIZED',
+      recordStatus TEXT DEFAULT 'ACTIVE',
+      sourceSystem TEXT
+    )
+  `);
+
+  issuanceDb.run(`
+    CREATE TABLE IF NOT EXISTS encoding_corrections (
+      id TEXT PRIMARY KEY,
+      iclItemId TEXT NOT NULL,
+      paymentId TEXT,
+      correctionType TEXT,
+      originalCheckNumber TEXT,
+      correctedCheckNumber TEXT,
+      originalAmount REAL,
+      correctedAmount REAL,
+      reason TEXT,
+      status TEXT DEFAULT 'PENDING',
+      createdBy TEXT,
+      createdTimestamp TEXT,
+      modifiedBy TEXT,
+      modifiedTimestamp TEXT,
+      modifiedCount INTEGER DEFAULT 0,
+      approvedBy TEXT,
+      approvedTimestamp TEXT,
+      approvalStatus TEXT DEFAULT 'UNAUTHORIZED',
+      recordStatus TEXT DEFAULT 'ACTIVE',
+      sourceSystem TEXT
+    )
+  `);
+
+  issuanceDb.run(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      entityName TEXT,
+      entityId TEXT,
+      actionType TEXT,
+      oldValue TEXT,
+      newValue TEXT,
+      timestamp TEXT,
+      userId TEXT
     )
   `);
 });
@@ -666,23 +764,40 @@ app.post('/api/icl-parser/upload', async (req, res) => {
       }
     );
 
-    // Save checks to check_payments
+    // Save items to icl_items table (with effective values = raw values)
     if (parsedData.checks && parsedData.checks.length > 0) {
       issuanceDb.serialize(() => {
-        const insertPayment = issuanceDb.prepare(`
-          INSERT INTO check_payments (
-            id, AccountNumber, SerialNumber, Date, Amount, CurrencyCode, BeneficiaryName,
-            RecordStatus, createdBy, createdTimestamp, modifiedCount
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        const insertItem = issuanceDb.prepare(`
+          INSERT INTO icl_items (
+            id, iclFileId, checkNumber, amount, routingNumber, accountNumber,
+            carAmount, larAmount, imageFrontPath, imageBackPath,
+            parsingStatus, effectiveCheckNumber, effectiveAmount,
+            createdBy, createdTimestamp, modifiedCount, recordStatus
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         parsedData.checks.forEach(check => {
-          const checkId = Date.now().toString() + Math.random().toString(36).substring(2, 9);
-          insertPayment.run([
-            checkId, check.accountNumber, check.serialNumber, check.checkDate || uploadDate,
-            check.amount, 'USD', check.payeeName || '', 'NEW', 'System', uploadDate, 0
+          const checkId = 'ICL-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+          insertItem.run([
+            checkId, id,
+            check.serialNumber, check.amount,
+            check.routingNumber || '', check.accountNumber,
+            check.carAmount || check.amount, check.larAmount || check.amount,
+            check.frontImagePath || '', check.backImagePath || '',
+            'PARSED',
+            check.serialNumber,  // effectiveCheckNumber starts = raw
+            check.amount,        // effectiveAmount starts = raw
+            'System', uploadDate, 0, 'ACTIVE'
           ]);
         });
-        insertPayment.finalize();
+        insertItem.finalize(async () => {
+          // Auto-run matching engine after all items are inserted
+          try {
+            const matchResults = await matchFile(id, issuanceDb, stopPaymentsDb, 'System');
+            console.log(`Matching complete for file ${fileName}: ${matchResults.length} items processed`);
+          } catch (matchErr) {
+            console.error('Matching engine error:', matchErr);
+          }
+        });
       });
     }
 
@@ -742,8 +857,224 @@ app.delete('/api/icl-parser/files/:id', (req, res) => {
 });
 
 
+// ── Check Exceptions API ─────────────────────────────────────────────────────
 
-const PORT = process.env.PORT || 3000;
+app.get('/api/check-exceptions', (req, res) => {
+  let query = `
+    SELECT e.*, p.AccountNumber, p.SerialNumber, p.Amount as PaidAmount, p.matchStatus,
+           i.checkNumber as rawCheckNumber, i.amount as rawAmount,
+           i.effectiveCheckNumber, i.effectiveAmount,
+           i.imageFrontPath, i.imageBackPath
+    FROM check_exceptions e
+    LEFT JOIN check_payments p ON e.paymentId = p.id
+    LEFT JOIN icl_items i ON e.iclItemId = i.id
+    WHERE e.recordStatus = 'ACTIVE'
+  `;
+  const params = [];
+  const filters = [];
+
+  if (req.query.status)    { filters.push(`e.status = ?`);         params.push(req.query.status); }
+  if (req.query.type)      { filters.push(`e.exceptionType = ?`);  params.push(req.query.type); }
+  if (req.query.severity)  { filters.push(`e.severity = ?`);       params.push(req.query.severity); }
+  if (req.query.account)   { filters.push(`p.AccountNumber = ?`);  params.push(req.query.account); }
+
+  if (filters.length > 0) query += ' AND ' + filters.join(' AND ');
+  query += ' ORDER BY e.createdTimestamp DESC';
+
+  issuanceDb.all(query, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.put('/api/check-exceptions/:id/resolve', (req, res) => {
+  const { resolutionNotes, resolvedBy } = req.body;
+  const now = new Date().toISOString();
+  issuanceDb.run(
+    `UPDATE check_exceptions SET status = 'RESOLVED', resolutionNotes = ?, resolvedBy = ?,
+     resolvedTimestamp = ?, modifiedTimestamp = ?, modifiedCount = modifiedCount + 1
+     WHERE id = ?`,
+    [resolutionNotes, resolvedBy, now, now, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
+});
+
+// ── ICL Items API ─────────────────────────────────────────────────────────────
+
+app.get('/api/icl-items', (req, res) => {
+  let query = 'SELECT * FROM icl_items WHERE recordStatus = \'ACTIVE\'';
+  const params = [];
+  if (req.query.iclFileId) { query += ' AND iclFileId = ?'; params.push(req.query.iclFileId); }
+  query += ' ORDER BY createdTimestamp DESC';
+  issuanceDb.all(query, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/icl-items/:id/rematch', async (req, res) => {
+  try {
+    const result = await rematchItem(req.params.id, issuanceDb, stopPaymentsDb, req.body.operatorId || 'System');
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Encoding Corrections API ──────────────────────────────────────────────────
+
+app.get('/api/corrections', (req, res) => {
+  let query = 'SELECT * FROM encoding_corrections WHERE recordStatus = \'ACTIVE\' ORDER BY createdTimestamp DESC';
+  issuanceDb.all(query, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/icl-items/:iclItemId/corrections', (req, res) => {
+  const { correctionType, correctedCheckNumber, correctedAmount, reason, createdBy } = req.body;
+  const iclItemId = req.params.iclItemId;
+  const now = new Date().toISOString();
+
+  issuanceDb.get('SELECT * FROM icl_items WHERE id = ?', [iclItemId], (err, item) => {
+    if (err || !item) return res.status(404).json({ error: 'ICL item not found' });
+
+    const correctionId = 'COR-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+    issuanceDb.run(
+      `INSERT INTO encoding_corrections (
+        id, iclItemId, correctionType,
+        originalCheckNumber, correctedCheckNumber,
+        originalAmount, correctedAmount,
+        reason, status, createdBy, createdTimestamp,
+        modifiedCount, approvalStatus, recordStatus
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, 0, 'UNAUTHORIZED', 'ACTIVE')`,
+      [
+        correctionId, iclItemId, correctionType,
+        item.effectiveCheckNumber, correctedCheckNumber || item.effectiveCheckNumber,
+        item.effectiveAmount, correctedAmount || item.effectiveAmount,
+        reason, createdBy || 'System', now
+      ],
+      (insErr) => {
+        if (insErr) return res.status(500).json({ error: insErr.message });
+        res.json({ id: correctionId, status: 'PENDING' });
+      }
+    );
+  });
+});
+
+app.post('/api/corrections/:id/approve', async (req, res) => {
+  const { approvedBy } = req.body;
+  const now = new Date().toISOString();
+
+  issuanceDb.get('SELECT * FROM encoding_corrections WHERE id = ?', [req.params.id], async (err, correction) => {
+    if (err || !correction) return res.status(404).json({ error: 'Correction not found' });
+    if (correction.status !== 'PENDING') return res.status(400).json({ error: 'Correction is not pending' });
+    if (correction.createdBy === approvedBy) return res.status(403).json({ error: 'Self-approval not permitted (maker-checker)' });
+
+    // Apply correction: update effective values on the ICL item
+    const updates = [];
+    const vals = [];
+    if (correction.correctionType === 'SERIAL' || correction.correctionType === 'BOTH') {
+      updates.push('effectiveCheckNumber = ?'); vals.push(correction.correctedCheckNumber);
+    }
+    if (correction.correctionType === 'DOLLAR' || correction.correctionType === 'BOTH') {
+      updates.push('effectiveAmount = ?'); vals.push(correction.correctedAmount);
+    }
+    updates.push('modifiedTimestamp = ?', 'modifiedCount = modifiedCount + 1');
+    vals.push(now, correction.iclItemId);
+
+    issuanceDb.run(
+      `UPDATE icl_items SET ${updates.join(', ')} WHERE id = ?`,
+      vals,
+      async (updErr) => {
+        if (updErr) return res.status(500).json({ error: updErr.message });
+
+        // Mark correction as applied
+        issuanceDb.run(
+          `UPDATE encoding_corrections SET status = 'APPLIED', approvalStatus = 'AUTHORIZED',
+           approvedBy = ?, approvedTimestamp = ?, modifiedTimestamp = ?
+           WHERE id = ?`,
+          [approvedBy, now, now, req.params.id],
+          async () => {
+            // Re-run matching with the corrected values
+            try {
+              const matchResult = await rematchItem(correction.iclItemId, issuanceDb, stopPaymentsDb, approvedBy);
+              res.json({ success: true, matchResult });
+            } catch (mErr) {
+              res.json({ success: true, matchWarning: mErr.message });
+            }
+          }
+        );
+      }
+    );
+  });
+});
+
+app.post('/api/corrections/:id/reject', (req, res) => {
+  const { rejectedBy, reason } = req.body;
+  const now = new Date().toISOString();
+  issuanceDb.run(
+    `UPDATE encoding_corrections SET status = 'REJECTED', approvalStatus = 'REJECTED',
+     approvedBy = ?, approvedTimestamp = ?, modifiedTimestamp = ?,
+     reason = COALESCE(reason, '') || ' [REJECTED: ' || ? || ']'
+     WHERE id = ?`,
+    [rejectedBy, now, now, reason || '', req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
+});
+
+// ── Check Payments API ────────────────────────────────────────────────────────
+
+app.get('/api/check-payments', (req, res) => {
+  let query = 'SELECT * FROM check_payments';
+  const params = [];
+  const filters = [];
+  if (req.query.accountNumber) { filters.push('AccountNumber = ?'); params.push(req.query.accountNumber); }
+  if (req.query.matchStatus)   { filters.push('matchStatus = ?');   params.push(req.query.matchStatus); }
+  if (filters.length > 0) query += ' WHERE ' + filters.join(' AND ');
+  query += ' ORDER BY createdTimestamp DESC';
+  issuanceDb.all(query, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// ── Audit Log API ─────────────────────────────────────────────────────────────
+
+app.post('/api/audit-log', (req, res) => {
+  const { entityName, entityId, actionType, oldValue, newValue, userId } = req.body;
+  const id = 'AUD-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+  issuanceDb.run(
+    'INSERT INTO audit_log (id, entityName, entityId, actionType, oldValue, newValue, timestamp, userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, entityName, entityId, actionType, JSON.stringify(oldValue), JSON.stringify(newValue), new Date().toISOString(), userId],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id });
+    }
+  );
+});
+
+app.get('/api/audit-log', (req, res) => {
+  let query = 'SELECT * FROM audit_log';
+  const params = [];
+  const filters = [];
+  if (req.query.entityName) { filters.push('entityName = ?'); params.push(req.query.entityName); }
+  if (req.query.entityId)   { filters.push('entityId = ?');   params.push(req.query.entityId); }
+  if (filters.length > 0) query += ' WHERE ' + filters.join(' AND ');
+  query += ' ORDER BY timestamp DESC LIMIT 500';
+  issuanceDb.all(query, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+
 app.listen(PORT, () => {
   console.log(`Server is running cleanly on port ${PORT}`);
 });

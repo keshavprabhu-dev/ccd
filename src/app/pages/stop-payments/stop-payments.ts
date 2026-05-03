@@ -4,6 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { App } from '../../app';
 import { environment } from '../../../environments/environment.development';
+import { CurrencyService } from '../../services/currency.service';
+import { ToastService } from '../../services/toast.service';
+import { AuditTrailComponent } from '../../shared/audit-trail/audit-trail';
+import { ErrorModalComponent } from '../../shared/error-modal/error-modal';
+import { ToastComponent } from '../../shared/toast-notification/toast-notification';
+import { PaginationComponent } from '../../shared/pagination-controls/pagination-controls';
+import { StatusBadgeComponent } from '../../shared/status-badge/status-badge';
 
 const API = `${environment.apiUrl}/stop-payments`;
 
@@ -45,7 +52,7 @@ interface StopStat {
 @Component({
   selector: 'app-stop-payments',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AuditTrailComponent, ErrorModalComponent, ToastComponent, PaginationComponent, StatusBadgeComponent],
   templateUrl: './stop-payments.html',
   styleUrl: './stop-payments.css',
 })
@@ -53,6 +60,8 @@ export class StopPayments implements OnInit {
   private app = inject(App);
   private http = inject(HttpClient);
   private cdr = inject(ChangeDetectorRef);
+  private currencyService = inject(CurrencyService);
+  readonly toast = inject(ToastService);
 
   get currentUser(): string {
     const user = this.app.currentUser();
@@ -65,7 +74,6 @@ export class StopPayments implements OnInit {
   availableCurrencies: any[] = [];
   isLoading = false;
   isSaving = false;
-  toastMessage: string | null = null;
   showFormModal = false;
   showErrorModal = false;
   errorMessage = '';
@@ -158,17 +166,9 @@ export class StopPayments implements OnInit {
   // ── Load All ──────────────────────────────────────────────────────────────
   ngOnInit() {
     this.loadAll();
-    this.loadCurrencies();
-  }
-
-  loadCurrencies() {
-    this.http.get<any[]>('http://localhost:3000/api/currencies').subscribe({
-      next: (data) => {
-        this.availableCurrencies = data;
-      },
-      error: (err) => {
-        console.error('Failed to load currencies', err);
-      }
+    this.currencyService.currencies$.subscribe({
+      next: (data) => this.availableCurrencies = data,
+      error: (err) => console.error('Failed to load currencies', err)
     });
   }
 
@@ -487,9 +487,7 @@ export class StopPayments implements OnInit {
   }
 
   showToast(msg: string) {
-    this.toastMessage = msg;
-    this.cdr.detectChanges();
-    setTimeout(() => { this.toastMessage = null; this.cdr.detectChanges(); }, 3500);
+    this.toast.show(msg);
   }
 
   formatAmount(v: number, currency: string = 'USD'): string {

@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { App } from '../../app';
 import { environment } from '../../../environments/environment.development';
+import { ToastService } from '../../services/toast.service';
+import { ToastComponent } from '../../shared/toast-notification/toast-notification';
 
 const API = `${environment.apiUrl}/administration`;
 
@@ -32,7 +34,7 @@ interface User {
 @Component({
   selector: 'app-administration',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ToastComponent],
   templateUrl: './administration.html',
   styleUrl: './administration.css',
 })
@@ -40,6 +42,7 @@ export class Administration implements OnInit {
   private http = inject(HttpClient);
   private app = inject(App);
   private cdr = inject(ChangeDetectorRef);
+  readonly toast = inject(ToastService);
 
   users: User[] = [];
   filteredUsers: User[] = [];
@@ -48,7 +51,6 @@ export class Administration implements OnInit {
   
   isFormEditable: boolean = false;
   isSaving: boolean = false;
-  toastMessage: string | null = null;
 
   get currentUser(): string {
     const user = this.app.currentUser();
@@ -156,12 +158,7 @@ export class Administration implements OnInit {
   }
 
   showToast(msg: string) {
-    this.toastMessage = msg;
-    this.cdr.detectChanges();
-    setTimeout(() => {
-      this.toastMessage = null;
-      this.cdr.detectChanges();
-    }, 3000);
+    this.toast.show(msg);
   }
 
   getStatusClass(status?: string): string {

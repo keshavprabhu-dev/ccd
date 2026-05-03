@@ -4,6 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { App } from '../../app';
 import { environment } from '../../../environments/environment.development';
+import { CurrencyService } from '../../services/currency.service';
+import { ToastService } from '../../services/toast.service';
+import { AuditTrailComponent } from '../../shared/audit-trail/audit-trail';
+import { ErrorModalComponent } from '../../shared/error-modal/error-modal';
+import { ToastComponent } from '../../shared/toast-notification/toast-notification';
+import { PaginationComponent } from '../../shared/pagination-controls/pagination-controls';
+import { StatusBadgeComponent } from '../../shared/status-badge/status-badge';
 
 const API = `${environment.apiUrl}/issuance`;
 
@@ -56,13 +63,15 @@ interface IssuanceRecord {
 @Component({
   selector: 'app-issuance-management',
   standalone: true,
-  imports: [CommonModule, FormsModule, DecimalPipe],
+  imports: [CommonModule, FormsModule, DecimalPipe, AuditTrailComponent, ErrorModalComponent, ToastComponent, PaginationComponent, StatusBadgeComponent],
   templateUrl: './issuance-management.html',
   styleUrl: './issuance-management.css',
 })
 export class IssuanceManagement implements OnInit {
   private app = inject(App);
   private http = inject(HttpClient);
+  private currencyService = inject(CurrencyService);
+  readonly toast = inject(ToastService);
 
   // Account Search Modal State
   showAccountSearchModal = false;
@@ -91,17 +100,9 @@ export class IssuanceManagement implements OnInit {
 
   ngOnInit() {
     this.loadFromApi();
-    this.loadCurrencies();
-  }
-
-  loadCurrencies() {
-    this.http.get<any[]>('http://localhost:3000/api/currencies').subscribe({
-      next: (data) => {
-        this.availableCurrencies = data;
-      },
-      error: (err) => {
-        console.error('Failed to load currencies', err);
-      }
+    this.currencyService.currencies$.subscribe({
+      next: (data) => this.availableCurrencies = data,
+      error: (err) => console.error('Failed to load currencies', err)
     });
   }
 
@@ -688,15 +689,8 @@ export class IssuanceManagement implements OnInit {
     this.paginatedRecords.forEach(r => r.selected = checked);
   }
 
-  toastMessage: string | null = null;
-  
   showToast(message: string) {
-    this.toastMessage = message;
-    this.cdr.detectChanges();
-    setTimeout(() => {
-      this.toastMessage = null;
-      this.cdr.detectChanges();
-    }, 3000);
+    this.toast.show(message);
   }
 
   bulkModalVisible: boolean = false;

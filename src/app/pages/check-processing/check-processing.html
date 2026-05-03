@@ -1,4 +1,378 @@
 <div class="page-container">
-  <h2>Check Processing</h2>
-  <p>This page will hold the Check Processing features.</p>
+
+  <!-- ── Page Header ─────────────────────────────────────────────────────── -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
+    <div>
+      <h2>Check Processing</h2>
+      <p style="margin: 0; color: #64748b;">Exception Workbench &amp; Positive Pay Decision Centre</p>
+    </div>
+    <button type="button" class="btn-icon" (click)="loadAll()" title="Refresh All">
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ── Summary KPI Cards ─────────────────────────────────────────────────── -->
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+    <div class="kpi-card kpi-danger">
+      <div class="kpi-value">{{ highCount }}</div>
+      <div class="kpi-label">High-Severity Open</div>
+    </div>
+    <div class="kpi-card kpi-warning">
+      <div class="kpi-value">{{ openCount }}</div>
+      <div class="kpi-label">Total Open Exceptions</div>
+    </div>
+    <div class="kpi-card kpi-success">
+      <div class="kpi-value">{{ resolvedCount }}</div>
+      <div class="kpi-label">Resolved</div>
+    </div>
+    <div class="kpi-card kpi-info">
+      <div class="kpi-value">{{ pendingCorrectionCount }}</div>
+      <div class="kpi-label">Pending Corrections</div>
+    </div>
+  </div>
+
+  <!-- ── Tab Bar ───────────────────────────────────────────────────────────── -->
+  <div class="tab-bar" style="margin-bottom: 1.5rem;">
+    <button class="tab-btn" [class.active]="selectedTab === 'workbench'"   (click)="selectedTab = 'workbench'">
+      Exception Workbench
+      <span class="tab-badge" *ngIf="openCount > 0">{{ openCount }}</span>
+    </button>
+    <button class="tab-btn" [class.active]="selectedTab === 'icl-files'"   (click)="selectedTab = 'icl-files'">ICL Files</button>
+    <button class="tab-btn" [class.active]="selectedTab === 'corrections'" (click)="selectedTab = 'corrections'">
+      Corrections
+      <span class="tab-badge tab-badge-warning" *ngIf="pendingCorrectionCount > 0">{{ pendingCorrectionCount }}</span>
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 1: Exception Workbench                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div *ngIf="selectedTab === 'workbench'" class="workbench-layout">
+
+    <!-- Left: Exception List ──────────────────────────────────────────────── -->
+    <div class="exception-list-panel">
+      <div class="form-header-actions" style="margin-bottom: 1rem;">
+        <h3 style="margin: 0;">Exceptions ({{ filteredExceptions.length }})</h3>
+        <div class="header-buttons">
+          <button type="button" class="btn-icon" (click)="toggleFilters()" [class.active-icon]="showFilters" title="Filter">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div *ngIf="showFilters" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+        <select class="form-control" style="font-size: 0.8rem;" [(ngModel)]="filters.status" (change)="applyFilters()">
+          <option value="">All Statuses</option>
+          <option value="OPEN">Open</option>
+          <option value="RESOLVED">Resolved</option>
+          <option value="ESCALATED">Escalated</option>
+        </select>
+        <select class="form-control" style="font-size: 0.8rem;" [(ngModel)]="filters.severity" (change)="applyFilters()">
+          <option value="">All Severities</option>
+          <option value="HIGH">High</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="LOW">Low</option>
+        </select>
+        <select class="form-control" style="font-size: 0.8rem;" [(ngModel)]="filters.type" (change)="applyFilters()">
+          <option value="">All Types</option>
+          <option value="PAID_WITHOUT_ISSUANCE">Paid Without Issuance</option>
+          <option value="AMOUNT_MISMATCH">Amount Mismatch</option>
+          <option value="PAID_AFTER_STOP">Paid After Stop</option>
+          <option value="SERIAL_MISMATCH">Serial Mismatch</option>
+        </select>
+        <input type="text" class="form-control" style="font-size: 0.8rem;" placeholder="Account #..." [(ngModel)]="filters.account" (input)="applyFilters()">
+      </div>
+
+      <!-- Exception rows -->
+      <div class="exception-list" *ngIf="!isLoading">
+        <div *ngFor="let ex of paginatedExceptions"
+             class="exception-row"
+             [class.selected]="selectedException?.id === ex.id"
+             [class.severity-high]="ex.severity === 'HIGH'"
+             [class.severity-medium]="ex.severity === 'MEDIUM'"
+             (click)="selectException(ex)">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+            <span class="severity-dot" [class.dot-high]="ex.severity === 'HIGH'" [class.dot-medium]="ex.severity === 'MEDIUM'" [class.dot-low]="ex.severity === 'LOW'"></span>
+            <span class="status-badge" [ngClass]="getStatusClass(ex.status)" style="font-size: 0.65rem; padding: 0.1rem 0.4rem;">{{ ex.status }}</span>
+          </div>
+          <div style="font-weight: 600; font-size: 0.85rem; color: #1e293b; margin-bottom: 0.15rem;">
+            {{ getExceptionTypeLabel(ex.exceptionType) }}
+          </div>
+          <div style="font-size: 0.75rem; color: #64748b;">
+            Acct: {{ ex.AccountNumber || '—' }} · Serial: {{ ex.effectiveCheckNumber || ex.rawCheckNumber || '—' }}
+          </div>
+          <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem;">
+            {{ ex.createdTimestamp | date:'MMM d, y HH:mm' }}
+          </div>
+        </div>
+        <div *ngIf="filteredExceptions.length === 0" style="padding: 2rem; text-align: center; color: #64748b;">
+          <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto 0.5rem; display: block; opacity: 0.4;">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          No exceptions found
+        </div>
+      </div>
+      <div *ngIf="isLoading" class="empty-state">Loading exceptions...</div>
+
+      <app-pagination [currentPage]="currentPage" [totalPages]="totalPages" (prev)="prevPage()" (next)="nextPage()"></app-pagination>
+    </div>
+
+    <!-- Right: Exception Detail ───────────────────────────────────────────── -->
+    <div class="exception-detail-panel">
+      <div *ngIf="!selectedException" class="empty-detail-state">
+        <svg width="64" height="64" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.2;">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <p>Select an exception to review details</p>
+      </div>
+
+      <div *ngIf="selectedException" style="height: 100%; display: flex; flex-direction: column; gap: 1rem;">
+
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h3 style="margin: 0 0 0.25rem 0; font-size: 1rem;">{{ getExceptionTypeLabel(selectedException.exceptionType) }}</h3>
+            <div style="font-size: 0.8rem; color: #64748b;">ID: {{ selectedException.id }}</div>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button *ngIf="selectedException.status === 'OPEN'" type="button" class="btn-outline-small" (click)="openCorrectionModal()">
+              ✏️ Correct Encoding
+            </button>
+            <button *ngIf="selectedException.status === 'OPEN'" type="button" class="btn-primary-small" (click)="openResolveModal()">
+              ✓ Resolve
+            </button>
+          </div>
+        </div>
+
+        <!-- Data grid -->
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h4>ICL Item Data</h4>
+            <div class="detail-row"><span>Account Number</span><strong>{{ selectedException.AccountNumber || '—' }}</strong></div>
+            <div class="detail-row"><span>Raw Check #</span><strong>{{ selectedException.rawCheckNumber || '—' }}</strong></div>
+            <div class="detail-row"><span>Raw Amount</span><strong>{{ selectedException.rawAmount | number:'1.2-2' }}</strong></div>
+            <div class="detail-row effective"><span>Effective Check #</span><strong>{{ selectedException.effectiveCheckNumber || '—' }}</strong></div>
+            <div class="detail-row effective"><span>Effective Amount</span><strong>{{ selectedException.effectiveAmount | number:'1.2-2' }}</strong></div>
+          </div>
+          <div class="detail-section">
+            <h4>Payment Match</h4>
+            <div class="detail-row"><span>Match Status</span>
+              <span class="status-badge" [ngClass]="'status-' + (selectedException.matchStatus || 'new').toLowerCase().split('_').join('-')">
+                {{ selectedException.matchStatus || '—' }}
+              </span>
+            </div>
+            <div class="detail-row"><span>Amount Paid</span><strong>{{ selectedException.PaidAmount | number:'1.2-2' }}</strong></div>
+            <div class="detail-row"><span>Exception Status</span>
+              <span class="status-badge" [ngClass]="getStatusClass(selectedException.status)">{{ selectedException.status }}</span>
+            </div>
+            <div class="detail-row"><span>Severity</span>
+              <span class="status-badge" [ngClass]="getSeverityClass(selectedException.severity)">{{ selectedException.severity }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resolution notes if resolved -->
+        <div *ngIf="selectedException.resolutionNotes"
+             style="background: #f0fdf4; border: 1px solid #86efac; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.85rem;">
+          <strong style="color: #15803d;">Resolution:</strong> {{ selectedException.resolutionNotes }}
+          <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+            By {{ selectedException.resolvedBy }} on {{ selectedException.resolvedTimestamp | date:'short' }}
+          </div>
+        </div>
+
+        <!-- Image viewer -->
+        <div class="image-viewer" *ngIf="selectedException.imageFrontPath || selectedException.imageBackPath">
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+            <button class="tab-btn" [class.active]="activeImageSide === 'front'" (click)="activeImageSide = 'front'">Front</button>
+            <button class="tab-btn" [class.active]="activeImageSide === 'back'"  (click)="activeImageSide = 'back'">Back</button>
+          </div>
+          <img *ngIf="activeImageSide === 'front' && selectedException.imageFrontPath"
+               [src]="'http://localhost:3000/api/images/icl/' + selectedException.imageFrontPath"
+               class="check-image" alt="Check Front">
+          <img *ngIf="activeImageSide === 'back' && selectedException.imageBackPath"
+               [src]="'http://localhost:3000/api/images/icl/' + selectedException.imageBackPath"
+               class="check-image" alt="Check Back">
+          <div *ngIf="(activeImageSide === 'front' && !selectedException.imageFrontPath) || (activeImageSide === 'back' && !selectedException.imageBackPath)"
+               class="no-image-placeholder">No {{ activeImageSide }} image available</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 2: ICL Files                                                      -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div *ngIf="selectedTab === 'icl-files'" class="table-card">
+    <div class="form-header-actions" style="margin-bottom: 1rem;">
+      <h3 style="margin: 0;">ICL Ingestion History</h3>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>File Name</th>
+            <th>Received</th>
+            <th>Format</th>
+            <th class="text-right">Items</th>
+            <th class="text-right">Total Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let f of iclFiles">
+            <td style="font-weight: 500;">{{ f.fileName }}</td>
+            <td>{{ f.uploadDate | date:'short' }}</td>
+            <td>{{ f.fileType || '—' }}</td>
+            <td class="text-right">{{ f.totalCount ?? '—' }}</td>
+            <td class="text-right">{{ f.totalAmount | number:'1.2-2' }}</td>
+          </tr>
+          <tr *ngIf="iclFiles.length === 0">
+            <td colspan="5" class="empty-state">No ICL files ingested yet.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 3: Encoding Corrections (Maker-Checker Queue)                    -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div *ngIf="selectedTab === 'corrections'" class="table-card">
+    <div class="form-header-actions" style="margin-bottom: 1rem;">
+      <h3 style="margin: 0;">Encoding Corrections — Approval Queue</h3>
+      <button type="button" class="btn-icon" (click)="loadCorrections()" title="Refresh">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ICL Item</th>
+            <th>Type</th>
+            <th>Original → Corrected</th>
+            <th>Reason</th>
+            <th>Submitted By</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let c of pendingCorrections">
+            <td style="font-family: monospace; font-size: 0.8rem;">{{ c.iclItemId }}</td>
+            <td><span class="status-badge status-pending">{{ c.correctionType }}</span></td>
+            <td style="font-size: 0.85rem;">
+              <div *ngIf="c.correctionType !== 'DOLLAR'">
+                Serial: <code>{{ c.originalCheckNumber }}</code> → <code>{{ c.correctedCheckNumber }}</code>
+              </div>
+              <div *ngIf="c.correctionType !== 'SERIAL'">
+                Amount: <code>{{ c.originalAmount | number:'1.2-2' }}</code> → <code>{{ c.correctedAmount | number:'1.2-2' }}</code>
+              </div>
+            </td>
+            <td style="font-size: 0.8rem; max-width: 200px;">{{ c.reason }}</td>
+            <td>{{ c.createdBy }}</td>
+            <td>{{ c.createdTimestamp | date:'shortDate' }}</td>
+            <td><span class="status-badge" [ngClass]="c.status === 'PENDING' ? 'status-pending' : c.status === 'APPLIED' ? 'status-approved' : 'status-void'">{{ c.status }}</span></td>
+            <td>
+              <div style="display: flex; gap: 0.5rem;" *ngIf="c.status === 'PENDING'">
+                <button type="button" class="btn-primary-small" (click)="approveCorrection(c)">Approve</button>
+                <button type="button" class="btn-outline-small" style="color: #ef4444;" (click)="rejectCorrection(c)">Reject</button>
+              </div>
+              <span *ngIf="c.status !== 'PENDING'" style="color: #94a3b8; font-size: 0.8rem;">—</span>
+            </td>
+          </tr>
+          <tr *ngIf="pendingCorrections.length === 0">
+            <td colspan="8" class="empty-state">No corrections on record.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
+
+<!-- ── Correction Modal ──────────────────────────────────────────────────── -->
+<div class="modal-overlay" *ngIf="showCorrectionModal">
+  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 520px;">
+    <div class="form-header-actions" style="margin-bottom: 1.5rem;">
+      <h3 style="margin: 0;">Encoding Correction</h3>
+      <button type="button" class="btn-icon" (click)="showCorrectionModal = false">
+        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div style="background: #fefce8; border: 1px solid #fde68a; padding: 0.75rem; border-radius: 6px; font-size: 0.8rem; margin-bottom: 1.5rem; color: #92400e;">
+      ⚠️ Corrections require supervisor approval before being applied. The original ICL values are preserved.
+    </div>
+
+    <div class="form-group">
+      <label>Correction Type <span class="required">*</span></label>
+      <select class="form-control" [(ngModel)]="correctionForm.correctionType">
+        <option value="SERIAL">Serial Encoding (Check Number)</option>
+        <option value="DOLLAR">Dollar Encoding (Amount)</option>
+        <option value="BOTH">Both</option>
+      </select>
+    </div>
+
+    <div class="form-group" *ngIf="correctionForm.correctionType !== 'DOLLAR'">
+      <label>Corrected Check Number <span class="required">*</span></label>
+      <input type="text" class="form-control" [(ngModel)]="correctionForm.correctedCheckNumber" placeholder="Enter correct serial number">
+      <small style="color: #64748b;">Original: {{ selectedException?.rawCheckNumber }}</small>
+    </div>
+
+    <div class="form-group" *ngIf="correctionForm.correctionType !== 'SERIAL'">
+      <label>Corrected Amount <span class="required">*</span></label>
+      <input type="number" class="form-control" step="0.01" [(ngModel)]="correctionForm.correctedAmount" placeholder="0.00">
+      <small style="color: #64748b;">Original: {{ selectedException?.rawAmount | number:'1.2-2' }}</small>
+    </div>
+
+    <div class="form-group">
+      <label>Reason <span class="required">*</span></label>
+      <textarea class="form-control" rows="2" [(ngModel)]="correctionForm.reason" placeholder="Describe why this correction is needed..."></textarea>
+    </div>
+
+    <div class="form-actions form-action-buttons" style="border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
+      <button type="button" class="btn-outline" (click)="showCorrectionModal = false">Cancel</button>
+      <button type="button" class="btn-primary" [disabled]="isSavingCorrection" (click)="submitCorrection()">
+        Submit for Approval
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Resolve Modal ─────────────────────────────────────────────────────── -->
+<div class="modal-overlay" *ngIf="showResolveModal">
+  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 460px;">
+    <h3>Resolve Exception</h3>
+    <p style="color: #64748b; font-size: 0.875rem; margin-bottom: 1rem;">Document the resolution decision for the audit trail.</p>
+    <div class="form-group">
+      <label>Resolution Notes <span class="required">*</span></label>
+      <textarea class="form-control" rows="3" [(ngModel)]="resolveNotes" placeholder="Describe how this exception was resolved..."></textarea>
+    </div>
+    <div class="form-actions form-action-buttons" style="border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
+      <button type="button" class="btn-outline" (click)="showResolveModal = false">Cancel</button>
+      <button type="button" class="btn-primary" [disabled]="!resolveNotes.trim() || isResolving" (click)="confirmResolve()">
+        <span *ngIf="!isResolving">Confirm Resolution</span>
+        <span *ngIf="isResolving">Saving...</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Shared components -->
+<app-toast></app-toast>
+<app-error-modal [visible]="showErrorModal" [message]="errorMessage" (dismiss)="closeErrorModal()"></app-error-modal>

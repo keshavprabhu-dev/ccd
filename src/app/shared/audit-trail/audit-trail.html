@@ -1,0 +1,14 @@
+<div style="background: var(--navy-blue); border: 1px solid var(--navy-blue-dark); padding: 1rem 1.5rem; border-radius: 6px; margin-top: 1.5rem; pointer-events: none; flex-shrink: 0;">
+  <h4 style="font-size: 0.8rem; color: #f8fafc; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 0.5rem; margin-top: 0; font-weight: 600;">
+    Audit Trail
+  </h4>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; font-size: 0.7rem;">
+    <div><strong style="color:#94a3b8;">Created By:</strong> <span style="color:#fff;">{{ record.createdBy || '' }}</span></div>
+    <div><strong style="color:#94a3b8;">Created At:</strong>  <span style="color:#fff;">{{ record.createdTimestamp  ? (record.createdTimestamp  | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
+    <div><strong style="color:#94a3b8;">Modified By:</strong> <span style="color:#fff;">{{ record.modifiedBy || '' }}</span></div>
+    <div><strong style="color:#94a3b8;">Modified At:</strong> <span style="color:#fff;">{{ record.modifiedTimestamp  ? (record.modifiedTimestamp  | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
+    <div><strong style="color:#94a3b8;">Approved By:</strong> <span style="color:#fff;">{{ record.approvedBy || '' }}</span></div>
+    <div><strong style="color:#94a3b8;">Approved At:</strong> <span style="color:#fff;">{{ record.approvedTimestamp  ? (record.approvedTimestamp  | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
+    <div><strong style="color:#94a3b8;">Modified Count:</strong> <span style="color:#fff;">{{ record.modifiedCount || 0 }}</span></div>
+  </div>
+</div>

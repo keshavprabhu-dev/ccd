@@ -150,12 +150,10 @@
               <td *ngIf="columns.approvedTimestamp">{{ record.approvedTimestamp | date:'short' }}</td>
               <td *ngIf="columns.modifiedCount">{{ record.modifiedCount }}</td>
               <td>
-                <span class="status-badge" [ngClass]="getStatusClass(record.recordStatus)">
-                  <svg *ngIf="record.recordStatus === 'APPROVED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 2px; display: inline-block; margin-top: -2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                  <svg *ngIf="record.recordStatus === 'ISSUED' || record.recordStatus === 'NEW' || record.recordStatus === 'IMPORTED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 2px; display: inline-block; margin-top: -2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                  {{ record.recordStatus }}
-                </span>
-                <span *ngIf="record.isDuplicate" class="status-badge status-duplicate" style="margin-top: 4px; display: block; text-align: center;">DUPLICATE</span>
+                <app-status-badge [status]="record.recordStatus || ''" [isDuplicate]="record.isDuplicate || false">
+                  <svg *ngIf="record.recordStatus === 'APPROVED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:2px;display:inline-block;margin-top:-2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                  <svg *ngIf="record.recordStatus === 'ISSUED' || record.recordStatus === 'NEW' || record.recordStatus === 'IMPORTED'" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:2px;display:inline-block;margin-top:-2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                </app-status-badge>
               </td>
             </tr>
             <tr *ngIf="paginatedRecords.length === 0">
@@ -179,11 +177,12 @@
         <button type="button" class="btn-primary" [disabled]="!canExecuteBulkDecision" (click)="executeBulkDecision()" style="padding: 0.75rem 1.5rem; width: auto; margin-top: 0;">Apply Decision</button>
       </div>
       
-      <div class="pagination-controls">
-        <button class="btn-outline" (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
-        <div class="page-info">Page {{ currentPage }} of {{ totalPages }}</div>
-        <button class="btn-outline" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
-      </div>
+      <app-pagination
+        [currentPage]="currentPage"
+        [totalPages]="totalPages"
+        (prev)="prevPage()"
+        (next)="nextPage()">
+      </app-pagination>
     </div>
   </div>
 </div>
@@ -351,26 +350,12 @@
       </ng-container>
     </div>
     
-    <div style="background: var(--navy-blue); border: 1px solid var(--navy-blue-dark); padding: 1rem 1.5rem; border-radius: 6px; margin-top: 1.5rem; pointer-events: none; flex-shrink: 0;">
-      <h4 style="font-size: 0.8rem; color: #f8fafc; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.2); padding-bottom: 0.5rem; margin-top: 0;">Audit Trail</h4>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; font-size: 0.7rem;">
-        <div><strong style="color: #94a3b8;">Created By:</strong> <span style="color: #ffffff;">{{ newRecord.createdBy || '' }}</span></div>
-        <div><strong style="color: #94a3b8;">Created At:</strong> <span style="color: #ffffff;">{{ newRecord.createdTimestamp ? (newRecord.createdTimestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
-        <div><strong style="color: #94a3b8;">Modified By:</strong> <span style="color: #ffffff;">{{ newRecord.modifiedBy || '' }}</span></div>
-        <div><strong style="color: #94a3b8;">Modified At:</strong> <span style="color: #ffffff;">{{ newRecord.modifiedTimestamp ? (newRecord.modifiedTimestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
-        <div><strong style="color: #94a3b8;">Approved By:</strong> <span style="color: #ffffff;">{{ newRecord.approvedBy || '' }}</span></div>
-        <div><strong style="color: #94a3b8;">Approved At:</strong> <span style="color: #ffffff;">{{ newRecord.approvedTimestamp ? (newRecord.approvedTimestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC') + ' UTC' : '' }}</span></div>
-        <div><strong style="color: #94a3b8;">Modified Count:</strong> <span style="color: #ffffff;">{{ newRecord.modifiedCount || 0 }}</span></div>
-      </div>
-    </div>
+    <app-audit-trail [record]="newRecord"></app-audit-trail>
   </div>
 </div>
 
-<!-- Toast Message -->
-<div class="toast-message" *ngIf="toastMessage">
-  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right: 0.5rem; vertical-align: middle;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-  {{ toastMessage }}
-</div>
+<!-- Toast -->
+<app-toast></app-toast>
 
 <!-- Bulk Action Modal -->
 <div class="modal-overlay" *ngIf="bulkModalVisible">
@@ -447,16 +432,5 @@
     </div>
   </div>
 </div>
-<!-- Error Message Modal -->
-<div class="modal-overlay" *ngIf="showErrorModal" style="z-index: 2000;">
-  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 500px; text-align: center; padding: 2.5rem;">
-    <div style="color: #ef4444; margin-bottom: 1.5rem;">
-      <svg width="64" height="64" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto;">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-      </svg>
-    </div>
-    <h3 style="color: #1e293b; margin-bottom: 1rem;">Validation Error</h3>
-    <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem; white-space: pre-wrap; text-align: left;">{{ errorMessage }}</p>
-    <button type="button" class="btn-primary" (click)="closeErrorModal()">Go Back and Fix</button>
-  </div>
-</div>
+<!-- Error Modal -->
+<app-error-modal [visible]="showErrorModal" [message]="errorMessage" (dismiss)="closeErrorModal()"></app-error-modal>
