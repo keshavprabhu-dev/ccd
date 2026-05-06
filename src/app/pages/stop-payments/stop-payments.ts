@@ -49,6 +49,14 @@ interface StopStat {
   records: StopPayment[];
 }
 
+interface UploadHistory {
+  id: string;
+  fileName: string;
+  uploadDate: string;
+  fileStatus: string;
+  records: StopPayment[];
+}
+
 @Component({
   selector: 'app-stop-payments',
   standalone: true,
@@ -74,25 +82,13 @@ export class StopPayments implements OnInit {
   availableCurrencies: any[] = [];
   isLoading = false;
   isSaving = false;
+  currentPage = 1;
+  pageSize = 15;
   showFormModal = false;
   showErrorModal = false;
   errorMessage = '';
 
-  // ── Pagination ──────────────────────────────────────────────────────────────
-  currentPage = 1;
-  pageSize = 10;
 
-  get paginatedRecords(): StopPayment[] {
-    const start = (this.currentPage - 1) * this.pageSize;
-    return this.filteredRecords.slice(start, start + this.pageSize);
-  }
-
-  get totalPages(): number {
-    return Math.ceil(this.filteredRecords.length / this.pageSize) || 1;
-  }
-
-  prevPage() { if (this.currentPage > 1) this.currentPage--; }
-  nextPage() { if (this.currentPage < this.totalPages) this.currentPage++; }
 
   // ── Search ─────────────────────────────────────────────────────────────────
   searchAccountNumber = '';
@@ -112,16 +108,15 @@ export class StopPayments implements OnInit {
   applyFilters() {
     const f = this.filters;
     this.filteredRecords = this.allRecords.filter(r => {
-      const matchAccount = r.accountNumber.toLowerCase().includes(f.accountNumber.toLowerCase());
-      const matchSerial  = r.serialNumber.toLowerCase().includes(f.serialNumber.toLowerCase());
-      const matchDate    = r.date.includes(f.date);
-      const matchAmount  = f.amount ? r.amount.toString().includes(f.amount) : true;
-      const matchReason  = r.reason.toLowerCase().includes(f.reason.toLowerCase());
-      const matchBeneficiary = r.beneficiaryName.toLowerCase().includes(f.beneficiaryName.toLowerCase());
+      const matchAccount = (r.accountNumber || '').toLowerCase().includes((f.accountNumber || '').toLowerCase());
+      const matchSerial  = (r.serialNumber || '').toLowerCase().includes((f.serialNumber || '').toLowerCase());
+      const matchDate    = (r.date || '').includes(f.date || '');
+      const matchAmount  = f.amount ? r.amount?.toString().includes(f.amount) : true;
+      const matchReason  = (r.reason || '').toLowerCase().includes((f.reason || '').toLowerCase());
+      const matchBeneficiary = (r.beneficiaryName || '').toLowerCase().includes((f.beneficiaryName || '').toLowerCase());
       const matchStatus  = f.status ? (r.status || '').toLowerCase() === f.status.toLowerCase() : true;
       return matchAccount && matchSerial && matchDate && matchAmount && matchReason && matchBeneficiary && matchStatus;
     });
-    this.currentPage = 1;
   }
 
   toggleFilters() {
@@ -130,6 +125,23 @@ export class StopPayments implements OnInit {
       this.filters = { accountNumber: '', serialNumber: '', date: '', amount: '', reason: '', beneficiaryName: '', status: '' };
       this.applyFilters();
     }
+  }
+
+  get paginatedRecords(): StopPayment[] {
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.filteredRecords.slice(start, start + this.pageSize);
+  }
+
+  get totalPages(): number {
+    return Math.max(1, Math.ceil(this.filteredRecords.length / this.pageSize));
+  }
+
+  prevPage() {
+    if (this.currentPage > 1) this.currentPage--;
+  }
+
+  nextPage() {
+    if (this.currentPage < this.totalPages) this.currentPage++;
   }
 
   // ── Stats (Header Table) ──────────────────────────────────────────────────
@@ -161,6 +173,118 @@ export class StopPayments implements OnInit {
   closeStatsModal() {
     this.showStatsModal = false;
     this.selectedStat = null;
+  }
+
+  // ── CSV Upload & History ──────────────────────────────────────────────────
+  historicalFiles: UploadHistory[] = [];
+  showFileDataModal = false;
+  selectedFileData: UploadHistory | null = null;
+  selectedFileDataRecords: StopPayment[] = [];
+  isHistoryCollapsed = false;
+
+  toggleHistory() {
+    this.isHistoryCollapsed = !this.isHistoryCollapsed;
+  }
+
+  onCsvFileSelectedLegacy(event: any) {
+    const file: File = event.target.files[0];
+    if (!file) return;
+
+    const fileReader = new FileReader();
+    fileReader.onload = (e) => {
+      const text = fileReader.result as string;
+      this.parseCSV(text, file.name);
+      
+      const fileInput = event.target as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+    };
+    fileReader.readAsText(file);
+  }
+
+  parseCSV(text: string, fileName: string) {
+    const lines = text.split('\n');
+    if (lines.length > 0) {
+      const newRecords: StopPayment[] = [];
+      const now = new Date().toISOString();
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line) {
+          const parts = line.split(',');
+          if (parts.length >= 4) {
+            newRecords.push({
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9) + i,
+              date: parts[0]?.trim() || now.split('T')[0],
+              serialNumber: parts[1]?.trim() || '',
+              accountNumber: parts[2]?.trim() || '',
+              beneficiaryName: parts[3]?.trim() || '',
+              amount: parseFloat(parts[4]) || 0,
+              currencyCode: 'USD',
+              reason: 'Imported from CSV',
+              status: 'STOP',
+              createdBy: this.currentUser,
+              createdTimestamp: now
+            });
+          }
+        }
+      }
+
+      if (newRecords.length > 0) {
+        // Mock saving the history object locally
+        const history: UploadHistory = {
+          id: Date.now().toString(),
+          fileName: fileName,
+          uploadDate: now,
+          fileStatus: 'Completed',
+          records: newRecords
+        };
+        this.historicalFiles.unshift(history);
+
+        // Bulk insert records to backend
+        this.http.post(`${API}/bulk`, newRecords).subscribe({
+          next: () => {
+            this.showToast(`Successfully uploaded ${newRecords.length} records from ${fileName}.`);
+            this.loadAll();
+          },
+          error: (err) => {
+            console.error('CSV bulk insert error:', err);
+            this.showToast('⚠️ Failed to save imported records.');
+          }
+        });
+      }
+    }
+  }
+
+  loadHistoricalFile(history: UploadHistory) {
+    this.selectedFileData = history;
+    this.selectedFileDataRecords = history.records;
+    this.showFileDataModal = true;
+  }
+
+  closeFileDataModal() {
+    this.showFileDataModal = false;
+    this.selectedFileData = null;
+    this.selectedFileDataRecords = [];
+  }
+
+  canDeleteHistoricalFile(history: UploadHistory): boolean {
+    return true;
+  }
+
+  deleteHistoricalFile(history: UploadHistory) {
+    if (confirm(`Are you sure you want to delete the file "${history.fileName}" and its records?`)) {
+      const params = new HttpParams().set('fileId', history.id); // For future backend support
+      
+      // Delete records manually from backend based on their IDs
+      const deleteReqs = history.records.map(r => this.http.delete(`${API}/${r.id}`));
+      
+      // Remove from local immediately
+      this.historicalFiles = this.historicalFiles.filter(h => h.id !== history.id);
+      
+      Promise.all(deleteReqs.map(r => r.toPromise().catch(e => null))).then(() => {
+        this.loadAll();
+        this.showToast(`Deleted file "${history.fileName}" successfully.`);
+      });
+    }
   }
 
   // ── Load All ──────────────────────────────────────────────────────────────
@@ -490,7 +614,7 @@ export class StopPayments implements OnInit {
     this.toast.show(msg);
   }
 
-  formatAmount(v: number, currency: string = 'USD'): string {
+  formatAmount(v: number, currency?: string): string {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(v);
   }
 

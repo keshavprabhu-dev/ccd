@@ -9,8 +9,9 @@ import { ToastService } from '../../services/toast.service';
 import { AuditTrailComponent } from '../../shared/audit-trail/audit-trail';
 import { ErrorModalComponent } from '../../shared/error-modal/error-modal';
 import { ToastComponent } from '../../shared/toast-notification/toast-notification';
-import { PaginationComponent } from '../../shared/pagination-controls/pagination-controls';
 import { StatusBadgeComponent } from '../../shared/status-badge/status-badge';
+import { FilePreviewColumn, FilePreviewModalComponent } from '../../shared/file-preview-modal/file-preview-modal';
+import { ConfirmModalComponent } from '../../shared/confirm-modal/confirm-modal';
 
 const API = `${environment.apiUrl}/issuance`;
 
@@ -42,6 +43,7 @@ interface IssuanceRecord {
   beneficiaryStateCode?: string;
   beneficiaryCountryCode?: string;
   currencyCode?: string;
+  sourceType?: 'MANUAL' | 'CSV_UPLOAD';
   remarks?: string;
   amount: number;
   // standard audit fields
@@ -55,6 +57,7 @@ interface IssuanceRecord {
   authStatus?: string;        // null | 'U' | 'A'
   recordStatus?: string;
   previousStatus?: string;
+  fileId?: string;
   selected?: boolean;
   isDuplicate?: boolean;
   historyList?: RecordHistoryEvent[];
@@ -63,7 +66,7 @@ interface IssuanceRecord {
 @Component({
   selector: 'app-issuance-management',
   standalone: true,
-  imports: [CommonModule, FormsModule, DecimalPipe, AuditTrailComponent, ErrorModalComponent, ToastComponent, PaginationComponent, StatusBadgeComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, AuditTrailComponent, ErrorModalComponent, ToastComponent, StatusBadgeComponent, FilePreviewModalComponent, ConfirmModalComponent],
   templateUrl: './issuance-management.html',
   styleUrl: './issuance-management.css',
 })
@@ -119,7 +122,7 @@ export class IssuanceManagement implements OnInit {
           fileName: f.fileName,
           uploadDate: f.uploadDate,
           fileStatus: f.fileStatus,
-          records: f.records || []
+          records: (f.records || []).map((r: any) => this.normalizeRecordFromApi(r))
         }));
 
         // Collect all file-linked records (de-duped by id)
@@ -138,9 +141,10 @@ export class IssuanceManagement implements OnInit {
         this.http.get<IssuanceRecord[]>(`${API}/records?orphaned=true`).subscribe({
           next: (orphans) => {
             orphans.forEach(r => {
-              if (r.id && !seen.has(r.id)) {
-                seen.add(r.id);
-                merged.push(r);
+              const normalized = this.normalizeRecordFromApi(r);
+              if (normalized.id && !seen.has(normalized.id)) {
+                seen.add(normalized.id);
+                merged.push(normalized);
               }
             });
             this.allRecords = merged;
@@ -180,6 +184,22 @@ export class IssuanceManagement implements OnInit {
     });
   }
 
+  private normalizeRecordFromApi(record: any): IssuanceRecord {
+    return {
+      ...record,
+      date: record.date || record.Date || '',
+      serialNumber: record.serialNumber || record.SerialNumber || '',
+      accountNumber: record.accountNumber || record.AccountNumber || '',
+      beneficiaryName: record.beneficiaryName || record.BeneficiaryName || '',
+      beneficiaryAddressLine1: record.beneficiaryAddressLine1 || record.beneficiaryAddress || '',
+      amount: Number(record.amount ?? record.Amount ?? 0),
+      currencyCode: record.currencyCode || record.CurrencyCode || 'USD',
+      sourceType: record.sourceType || 'MANUAL',
+      recordStatus: record.recordStatus || record.RecordStatus || 'NEW',
+      historyList: Array.isArray(record.historyList) ? record.historyList : []
+    };
+  }
+
   /** Persist a single record update to the backend. */
   private saveRecord(record: IssuanceRecord, isNew: boolean = false) {
     if (!record.id) return;
@@ -212,9 +232,6 @@ export class IssuanceManagement implements OnInit {
     return this.allRecords.filter(r => r.recordStatus === 'NEW').length;
   }
   
-  // Pagination
-  currentPage: number = 1;
-  pageSize: number = 10;
   
   filters = {
     date: '',
@@ -224,6 +241,7 @@ export class IssuanceManagement implements OnInit {
     beneficiaryAddress: '',
     amount: '',
     currencyCode: '',
+    sourceType: '',
     createdBy: '',
     createdTimestamp: '',
     modifiedBy: '',
@@ -260,6 +278,7 @@ export class IssuanceManagement implements OnInit {
         beneficiaryAddress: '',
         amount: '',
         currencyCode: '',
+        sourceType: '',
         createdBy: '',
         createdTimestamp: '',
         modifiedBy: '',
@@ -282,6 +301,7 @@ export class IssuanceManagement implements OnInit {
     beneficiaryAddress: false,
     amount: true,
     currencyCode: true,
+    sourceType: true,
     createdBy: false,
     createdTimestamp: false,
     modifiedBy: false,
@@ -310,6 +330,7 @@ export class IssuanceManagement implements OnInit {
       beneficiaryStateCode: '',
       beneficiaryCountryCode: '',
       currencyCode: 'USD',
+      sourceType: 'MANUAL',
       remarks: '',
       amount: 0,
       createdBy: '',
@@ -393,6 +414,8 @@ export class IssuanceManagement implements OnInit {
   selectedFile: File | null = null;
   selectedFileName: string = '';
   isUploading: boolean = false;
+  currentPage = 1;
+  pageSize = 15;
 
   onFileSelected(event: any) {
     const file: File = event.target.files[0];
@@ -404,6 +427,18 @@ export class IssuanceManagement implements OnInit {
 
   uploadFile() {
     if (this.selectedFile) {
+      const isDuplicateFile = this.historicalFiles.some(
+        h => h.fileName.toLowerCase() === this.selectedFileName.toLowerCase()
+      );
+      const allowDuplicate = !isDuplicateFile || confirm(
+        `A file named "${this.selectedFileName}" has already been uploaded. Upload it again?`
+      );
+      if (!allowDuplicate) {
+        this.clearSelectedFile();
+        this.showToast('Upload cancelled. Duplicate file was not imported.');
+        return;
+      }
+
       this.isUploading = true;
       const fileReader = new FileReader();
       
@@ -412,16 +447,12 @@ export class IssuanceManagement implements OnInit {
         
         setTimeout(() => {
           try {
-            this.parseCSV(text);
+            this.parseCSV(text, isDuplicateFile);
           } catch (error) {
             console.error('Error during CSV parsing:', error);
+            this.showToast('Upload failed. The CSV could not be parsed.');
           } finally {
-            this.selectedFile = null;
-            this.selectedFileName = '';
-            const fileInput = document.getElementById('fileUpload') as HTMLInputElement;
-            if (fileInput) {
-              fileInput.value = '';
-            }
+            this.clearSelectedFile();
             this.isUploading = false;
             this.cdr.detectChanges();
           }
@@ -438,27 +469,82 @@ export class IssuanceManagement implements OnInit {
     }
   }
 
-  parseCSV(text: string) {
-    const lines = text.split('\n');
+  private clearSelectedFile() {
+    this.selectedFile = null;
+    this.selectedFileName = '';
+    const fileInput = document.getElementById('fileUpload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+  }
+
+  private parseCsvRows(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let value = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const next = text[i + 1];
+
+      if (char === '"' && inQuotes && next === '"') {
+        value += '"';
+        i++;
+      } else if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        row.push(value.trim());
+        value = '';
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (char === '\r' && next === '\n') i++;
+        row.push(value.trim());
+        if (row.some(cell => cell !== '')) rows.push(row);
+        row = [];
+        value = '';
+      } else {
+        value += char;
+      }
+    }
+
+    row.push(value.trim());
+    if (row.some(cell => cell !== '')) rows.push(row);
+    return rows;
+  }
+
+  parseCSV(text: string, overrideDuplicate = false) {
+    const lines = this.parseCsvRows(text);
     if (lines.length > 0) {
       const newRecords: IssuanceRecord[] = [];
       // Start from 1 assuming there's a header: IssuedDate,IssuedSerialNumber,AccountNumber,Beneficiary,Amount
       for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line) {
-          const parts = line.split(',');
-          if (parts.length >= 5) {
+        const parts = lines[i];
+          if (parts.length >= 4) {
             const serialNumber = parts[1]?.trim() || '';
             const accountNumber = parts[2]?.trim() || '';
             
+            let beneficiaryName = '';
+            let amount = 0;
+            let beneficiaryAddressLine1 = '';
+            
+            if (parts.length >= 5) {
+              beneficiaryName = parts[3]?.trim() || '';
+              amount = parseFloat(parts[4]) || 0;
+              if (parts.length > 5) {
+                beneficiaryAddressLine1 = parts[5]?.trim() || '';
+              }
+            } else {
+              amount = parseFloat(parts[3]) || 0;
+            }
+
             newRecords.push({
               id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
               date: parts[0]?.trim() || '',
               serialNumber: serialNumber,
               accountNumber: accountNumber,
-              beneficiaryName: parts[3]?.trim() || '',
-              beneficiaryAddressLine1: parts[4]?.trim() || '',
-              amount: parseFloat(parts[5]) || parseFloat(parts[4]) || 0, // Fallback for old CSVs
+              beneficiaryName: beneficiaryName,
+              beneficiaryAddressLine1: beneficiaryAddressLine1,
+              amount: amount,
+              currencyCode: 'USD',
+              sourceType: 'CSV_UPLOAD',
               createdBy: this.currentUser,
               createdTimestamp: new Date().toISOString(),
               modifiedCount: 0,
@@ -472,7 +558,6 @@ export class IssuanceManagement implements OnInit {
               }]
             });
           }
-        }
       }
       if (newRecords.length > 0) {
         const newFile = {
@@ -480,7 +565,8 @@ export class IssuanceManagement implements OnInit {
           fileName: this.selectedFileName || 'Imported Data',
           uploadDate: new Date().toISOString(),
           fileStatus: 'New',
-          records: JSON.parse(JSON.stringify(newRecords))
+          records: JSON.parse(JSON.stringify(newRecords)),
+          override: overrideDuplicate
         };
 
         // Persist to backend first, then update local state on success
@@ -494,7 +580,8 @@ export class IssuanceManagement implements OnInit {
             }
             this.activeHistoryId = newFile.id;
             this.applyFilters();
-            this.showToast(`Imported ${newRecords.length} records. Unique checks applied for visibility.`);
+            this.loadHistoricalFile(newFile);
+            this.showToast(`Imported ${newRecords.length} record(s) from "${newFile.fileName}".`);
           },
           error: (err) => {
             console.error('Failed to save file to API:', err);
@@ -509,14 +596,6 @@ export class IssuanceManagement implements OnInit {
     this.applyFilters();
   }
 
-  get paginatedRecords(): IssuanceRecord[] {
-    const startIndex = (this.currentPage - 1) * this.pageSize;
-    return this.filteredRecords.slice(startIndex, startIndex + this.pageSize);
-  }
-
-  get totalPages(): number {
-    return Math.ceil(this.filteredRecords.length / this.pageSize) || 1;
-  }
 
   activeHistoryId: string | null = null;
 
@@ -539,17 +618,18 @@ export class IssuanceManagement implements OnInit {
       const matchBeneficiary = record.beneficiaryName.toLowerCase().includes(this.filters.beneficiaryName.toLowerCase());
       const matchAddress = record.beneficiaryAddressLine1 ? record.beneficiaryAddressLine1.toLowerCase().includes(this.filters.beneficiaryAddress.toLowerCase()) : true;
       const matchAmount = this.filters.amount ? record.amount.toString().includes(this.filters.amount) : true;
-      const matchCurrency = record.currencyCode?.toLowerCase().includes(this.filters.currencyCode.toLowerCase());
-      const matchCreatedBy = record.createdBy?.toLowerCase().includes(this.filters.createdBy.toLowerCase());
-      const matchCreatedDate = record.createdTimestamp?.includes(this.filters.createdTimestamp);
-      const matchModifiedBy = record.modifiedBy?.toLowerCase().includes(this.filters.modifiedBy.toLowerCase());
-      const matchModifiedDate = record.modifiedTimestamp?.includes(this.filters.modifiedTimestamp);
-      const matchApprovedBy = record.approvedBy?.toLowerCase().includes(this.filters.approvedBy.toLowerCase());
-      const matchApprovedDate = record.approvedTimestamp?.includes(this.filters.approvedTimestamp);
+      const matchCurrency = (record.currencyCode || '').toLowerCase().includes(this.filters.currencyCode.toLowerCase());
+      const matchSourceType = !this.filters.sourceType || (record.sourceType || '') === this.filters.sourceType;
+      const matchCreatedBy = (record.createdBy || '').toLowerCase().includes(this.filters.createdBy.toLowerCase());
+      const matchCreatedDate = (record.createdTimestamp || '').includes(this.filters.createdTimestamp);
+      const matchModifiedBy = (record.modifiedBy || '').toLowerCase().includes(this.filters.modifiedBy.toLowerCase());
+      const matchModifiedDate = (record.modifiedTimestamp || '').includes(this.filters.modifiedTimestamp);
+      const matchApprovedBy = (record.approvedBy || '').toLowerCase().includes(this.filters.approvedBy.toLowerCase());
+      const matchApprovedDate = (record.approvedTimestamp || '').includes(this.filters.approvedTimestamp);
       const matchModCount = this.filters.modifiedCount ? record.modifiedCount?.toString().includes(this.filters.modifiedCount) : true;
-      const matchStatus = record.recordStatus?.toLowerCase().includes(this.filters.recordStatus.toLowerCase());
+      const matchStatus = (record.recordStatus || '').toLowerCase().includes(this.filters.recordStatus.toLowerCase());
       
-      return matchDate && matchSerial && matchAccount && matchBeneficiary && matchAddress && matchAmount && matchCurrency && matchCreatedBy && matchCreatedDate && matchModifiedBy && matchModifiedDate && matchApprovedBy && matchApprovedDate && matchModCount && matchStatus;
+      return matchDate && matchSerial && matchAccount && matchBeneficiary && matchAddress && matchAmount && matchCurrency && matchSourceType && matchCreatedBy && matchCreatedDate && matchModifiedBy && matchModifiedDate && matchApprovedBy && matchApprovedDate && matchModCount && matchStatus;
     });
 
     if (this.sortColumn) {
@@ -568,20 +648,57 @@ export class IssuanceManagement implements OnInit {
         return 0;
       });
     }
-    // Reset to first page whenever filters change
-    this.currentPage = 1;
+    this.currentPage = Math.min(this.currentPage, this.totalPages);
+  }
+
+  get paginatedRecords(): IssuanceRecord[] {
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.filteredRecords.slice(start, start + this.pageSize);
+  }
+
+  get totalPages(): number {
+    return Math.max(1, Math.ceil(this.filteredRecords.length / this.pageSize));
+  }
+
+  getSourceTypeLabel(sourceType?: string): string {
+    return sourceType === 'CSV_UPLOAD' ? 'CSV Upload' : 'Manual';
   }
 
   prevPage() {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-    }
+    if (this.currentPage > 1) this.currentPage--;
   }
 
   nextPage() {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-    }
+    if (this.currentPage < this.totalPages) this.currentPage++;
+  }
+
+  downloadCsvTemplate() {
+    const headers = [
+      'IssuedDate',
+      'SerialNumber',
+      'AccountNumber',
+      'BeneficiaryName',
+      'Amount',
+      'BeneficiaryAddressLine1'
+    ];
+    const sampleRow = [
+      '2026-05-06',
+      '100001',
+      '1000123456',
+      'Example Payee Inc',
+      '1250.00',
+      '123 Example Street'
+    ];
+    const csvContent = [headers.join(','), sampleRow.map(value => `"${value}"`).join(',')].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'issuance_upload_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   isFormValid(): boolean {
@@ -972,42 +1089,90 @@ export class IssuanceManagement implements OnInit {
     return 'In Progress';
   }
 
+  showFileDataModal = false;
+  selectedFileData: UploadHistory | null = null;
+  selectedFileDataRecords: IssuanceRecord[] = [];
+  pendingDeleteHistory: UploadHistory | null = null;
+  readonly filePreviewColumns: FilePreviewColumn[] = [
+    { key: 'date', label: 'Issue Date' },
+    { key: 'serialNumber', label: 'Serial Number' },
+    { key: 'accountNumber', label: 'Account Number' },
+    { key: 'beneficiaryName', label: 'Beneficiary' },
+    { key: 'sourceType', label: 'Source' },
+    { key: 'beneficiaryAddressLine1', label: 'Address' },
+    { key: 'amount', label: 'Amount', align: 'right', format: 'number' },
+    { key: 'recordStatus', label: 'Status' }
+  ];
+
   loadHistoricalFile(history: UploadHistory) {
     this.activeHistoryId = history.id;
     this.applyFilters();
-    this.startNewRecord();
-    this.showToast(`Viewing isolated records mapped from ${history.fileName}`);
+    this.selectedFileData = history;
+    this.selectedFileDataRecords = this.getLiveRecordsForHistory(history);
+    this.showFileDataModal = true;
+  }
+
+  closeFileDataModal() {
+    this.showFileDataModal = false;
+    this.selectedFileData = null;
+    this.selectedFileDataRecords = [];
+  }
+
+  get filePreviewSubtitle(): string {
+    return 'Review uploaded issuance data before moving into decisioning and approval.';
+  }
+
+  get filePreviewUploadedLabel(): string {
+    return this.selectedFileData?.uploadDate || '';
+  }
+
+  get deleteHistoryConfirmMessage(): string {
+    const fileName = this.pendingDeleteHistory?.fileName || 'this uploaded file';
+    return `Are you sure you want to permanently delete "${fileName}" and its issuance records?`;
   }
 
   showAllRecords() {
     this.activeHistoryId = null;
     this.applyFilters();
-    this.startNewRecord();
-    this.showToast('Viewing comprehensive record set');
+    this.closeFileDataModal();
+    this.showToast('Viewing all issuance records.');
   }
 
   canDeleteHistoricalFile(history: UploadHistory): boolean {
-    return this.getDynamicFileStatus(history) === 'New';
+    return true;
   }
 
-  deleteHistoricalFile(history: UploadHistory) {
-    if (this.canDeleteHistoricalFile(history)) {
-      if (confirm(`Are you sure you want to completely delete the file "${history.fileName}"?`)) {
-        const liveRecords = this.getLiveRecordsForHistory(history);
-        const idsToRemove = new Set(liveRecords.map(r => r.id));
-        
-        if (idsToRemove.size > 0) {
-          this.allRecords = this.allRecords.filter(r => !idsToRemove.has(r.id));
-        }
-        
-        this.historicalFiles = this.historicalFiles.filter(h => h.id !== history.id);
-        this.deleteFileFromApi(history.id);
-        this.applyFilters();
-        this.showToast(`Deleted file "${history.fileName}" successfully.`);
-      }
-    } else {
-      this.showToast('Cannot delete file. Only files where all records are "New" can be deleted.');
+  requestDeleteHistoricalFile(history: UploadHistory) {
+    this.pendingDeleteHistory = history;
+  }
+
+  cancelDeleteHistoricalFile() {
+    this.pendingDeleteHistory = null;
+  }
+
+  confirmDeleteHistoricalFile() {
+    const history = this.pendingDeleteHistory;
+    if (!history) return;
+    this.pendingDeleteHistory = null;
+
+    const liveRecords = this.getLiveRecordsForHistory(history);
+    const idsToRemove = new Set(liveRecords.map(r => r.id));
+
+    if (idsToRemove.size > 0) {
+      this.allRecords = this.allRecords.filter(r => !idsToRemove.has(r.id));
     }
+
+    this.historicalFiles = this.historicalFiles.filter(h => h.id !== history.id);
+    if (this.activeHistoryId === history.id) {
+      this.activeHistoryId = null;
+    }
+    if (this.selectedFileData?.id === history.id) {
+      this.closeFileDataModal();
+    }
+
+    this.deleteFileFromApi(history.id);
+    this.applyFilters();
+    this.showToast(`Deleted file "${history.fileName}" successfully.`);
   }
 
   submitForm() {

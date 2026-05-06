@@ -9,6 +9,7 @@ const { parseX9Buffer } = require('./x9-parser');
 const { matchFile, rematchItem } = require('./matching-engine');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 app.use(helmet({ crossOriginResourcePolicy: false })); // Allowed for static images locally
 app.use(cors());
 
@@ -90,6 +91,8 @@ issuanceDb.serialize(() => {
   issuanceDb.run("ALTER TABLE issuance_records ADD COLUMN beneficiaryAddress TEXT", (err) => {
     // Ignore error if column already exists
   });
+  issuanceDb.run("ALTER TABLE issuance_records ADD COLUMN sourceType TEXT DEFAULT 'MANUAL'", () => {});
+  issuanceDb.run("UPDATE issuance_records SET sourceType = 'CSV_UPLOAD' WHERE fileId IS NOT NULL AND (sourceType IS NULL OR sourceType = 'MANUAL')", () => {});
 
   issuanceDb.run(`
     CREATE TABLE IF NOT EXISTS check_issuance (
@@ -114,9 +117,12 @@ issuanceDb.serialize(() => {
       approvedBy TEXT,
       approvedTimestamp TEXT,
       approvalStatus TEXT,
-      modifiedCount INTEGER
+      modifiedCount INTEGER,
+      sourceType TEXT DEFAULT 'MANUAL'
     )
   `);
+  issuanceDb.run("ALTER TABLE check_issuance ADD COLUMN sourceType TEXT DEFAULT 'MANUAL'", () => {});
+  issuanceDb.run("UPDATE check_issuance SET sourceType = 'MANUAL' WHERE sourceType IS NULL", () => {});
 
   issuanceDb.run(`
     CREATE TABLE IF NOT EXISTS check_payments (
@@ -405,46 +411,57 @@ app.get('/api/issuance/files', (req, res) => {
 
 app.post('/api/issuance/files', (req, res) => {
   const file = req.body;
-  issuanceDb.run(
-    'INSERT INTO historical_files (id, fileName, uploadDate, fileStatus) VALUES (?, ?, ?, ?)',
-    [file.id, file.fileName, file.uploadDate, file.fileStatus],
-    (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      
-      // Also insert records if they exist
-      if (file.records && Array.isArray(file.records)) {
-        issuanceDb.serialize(() => {
-          const insertRecord = issuanceDb.prepare(`
-            INSERT INTO issuance_records (
-              id, date, serialNumber, accountNumber, beneficiaryName, beneficiaryAddress, amount, createdBy, 
-              createdTimestamp, modifiedBy, modifiedTimestamp, approvedBy, approvedTimestamp, 
-              modifiedCount, recordStatus, previousStatus, fileId, historyList, authStatus
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `);
-          
-          let hasError = false;
-          file.records.forEach(r => {
-            insertRecord.run(
-              r.id, r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress, r.amount, 
-              r.createdBy, r.createdTimestamp || new Date().toISOString(), r.modifiedBy, r.modifiedTimestamp, 
-              r.approvedBy, r.approvedTimestamp, r.modifiedCount || 0, r.recordStatus, 
-              r.previousStatus, file.id, JSON.stringify(r.historyList || []), r.authStatus,
-              (runErr) => { if (runErr) hasError = true; }
-            );
-          });
-          insertRecord.finalize((finalErr) => {
-            if (hasError || finalErr) {
-              if (!res.headersSent) res.status(500).json({ error: "One or more records failed to save." });
-            } else {
-              if (!res.headersSent) res.json({ success: true });
-            }
-          });
-        });
-      } else {
-        res.json({ success: true });
-      }
+  issuanceDb.get('SELECT id FROM historical_files WHERE lower(fileName) = lower(?)', [file.fileName], (lookupErr, existing) => {
+    if (lookupErr) return res.status(500).json({ error: lookupErr.message });
+    if (existing && !file.override) {
+      return res.status(409).json({ error: 'A file with this name has already been uploaded.' });
     }
-  );
+
+    issuanceDb.serialize(() => {
+      if (existing && file.override) {
+        issuanceDb.run('DELETE FROM issuance_records WHERE fileId = ?', [existing.id]);
+        issuanceDb.run('DELETE FROM historical_files WHERE id = ?', [existing.id]);
+      }
+
+      issuanceDb.run(
+        'INSERT INTO historical_files (id, fileName, uploadDate, fileStatus) VALUES (?, ?, ?, ?)',
+        [file.id, file.fileName, file.uploadDate, file.fileStatus],
+        (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+
+          if (file.records && Array.isArray(file.records)) {
+            const insertRecord = issuanceDb.prepare(`
+              INSERT INTO issuance_records (
+                id, date, serialNumber, accountNumber, beneficiaryName, beneficiaryAddress, amount, createdBy,
+                createdTimestamp, modifiedBy, modifiedTimestamp, approvedBy, approvedTimestamp,
+                modifiedCount, recordStatus, previousStatus, fileId, historyList, authStatus, sourceType
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+
+            let hasError = false;
+            file.records.forEach(r => {
+              insertRecord.run(
+                r.id, r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddressLine1 || r.beneficiaryAddress || '', r.amount,
+                r.createdBy, r.createdTimestamp || new Date().toISOString(), r.modifiedBy, r.modifiedTimestamp,
+                r.approvedBy, r.approvedTimestamp, r.modifiedCount || 0, r.recordStatus,
+                r.previousStatus, file.id, JSON.stringify(r.historyList || []), r.authStatus, r.sourceType || 'CSV_UPLOAD',
+                (runErr) => { if (runErr) hasError = true; }
+              );
+            });
+            insertRecord.finalize((finalErr) => {
+              if (hasError || finalErr) {
+                if (!res.headersSent) res.status(500).json({ error: 'One or more records failed to save.' });
+              } else {
+                if (!res.headersSent) res.json({ success: true });
+              }
+            });
+          } else {
+            res.json({ success: true });
+          }
+        }
+      );
+    });
+  });
 });
 
 app.delete('/api/issuance/files/:id', (req, res) => {
@@ -464,12 +481,12 @@ app.post('/api/issuance/records', (req, res) => {
     INSERT INTO check_issuance (
       id, Date, SerialNumber, accountNumber, beneficiaryName, beneficiaryAddressLine1, Amount, createdBy, 
       createdTimestamp, modifiedBy, modifiedTimestamp, approvedBy, approvedTimestamp, 
-      modifiedCount, RecordStatus
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      modifiedCount, RecordStatus, sourceType
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
-    r.id, r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress, r.amount, 
+    r.id, r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddressLine1 || r.beneficiaryAddress, r.amount, 
     r.createdBy, r.createdTimestamp || new Date().toISOString(), r.modifiedBy, r.modifiedTimestamp, 
-    r.approvedBy, r.approvedTimestamp, r.modifiedCount || 0, r.recordStatus || 'NEW'
+    r.approvedBy, r.approvedTimestamp, r.modifiedCount || 0, r.recordStatus || 'NEW', r.sourceType || 'MANUAL'
   ], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
@@ -488,7 +505,10 @@ app.get('/api/issuance/records', (req, res) => {
       serialNumber: r.SerialNumber,
       amount: r.Amount,
       recordStatus: r.RecordStatus,
-      beneficiaryAddress: r.beneficiaryAddressLine1
+      beneficiaryAddress: r.beneficiaryAddressLine1,
+      beneficiaryAddressLine1: r.beneficiaryAddressLine1,
+      currencyCode: r.CurrencyCode,
+      sourceType: r.sourceType || 'MANUAL'
     })));
   });
 });
@@ -499,12 +519,12 @@ app.put('/api/issuance/records/:id', (req, res) => {
     UPDATE check_issuance SET
       Date = ?, SerialNumber = ?, accountNumber = ?, beneficiaryName = ?, beneficiaryAddressLine1 = ?, amount = ?, 
       modifiedBy = ?, modifiedTimestamp = ?, approvedBy = ?, approvedTimestamp = ?, 
-      modifiedCount = ?, RecordStatus = ?
+      modifiedCount = ?, RecordStatus = ?, sourceType = ?
     WHERE id = ?
   `, [
-    r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddress, r.amount, 
+    r.date, r.serialNumber, r.accountNumber, r.beneficiaryName, r.beneficiaryAddressLine1 || r.beneficiaryAddress, r.amount, 
     r.modifiedBy, r.modifiedTimestamp, r.approvedBy, r.approvedTimestamp, 
-    r.modifiedCount, r.recordStatus, req.params.id
+    r.modifiedCount, r.recordStatus, r.sourceType || 'MANUAL', req.params.id
   ], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });

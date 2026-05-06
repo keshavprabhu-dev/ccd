@@ -1,0 +1,52 @@
+<div class="preview-overlay" *ngIf="visible">
+  <div class="preview-shell" (click)="$event.stopPropagation()">
+    <div class="preview-header">
+      <div>
+        <h3 class="preview-title">{{ title }}</h3>
+        <p class="preview-subtitle" *ngIf="subtitle">{{ subtitle }}</p>
+      </div>
+      <button type="button" class="preview-close" (click)="dismiss.emit()" aria-label="Close preview">x</button>
+    </div>
+
+    <div class="preview-metrics">
+      <div class="metric">
+        <div class="metric-label">Uploaded</div>
+        <div class="metric-value">{{ uploadedLabel || '-' }}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Records</div>
+        <div class="metric-value">{{ recordCount }}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Status</div>
+        <div class="metric-value">{{ statusLabel || '-' }}</div>
+      </div>
+    </div>
+
+    <div class="preview-table-wrap">
+      <table class="preview-table" *ngIf="records.length > 0; else emptyState">
+        <thead>
+          <tr>
+            <th *ngFor="let column of columns" [class.align-right]="column.align === 'right'">
+              {{ column.label }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let record of records">
+            <td *ngFor="let column of columns" [class.align-right]="column.align === 'right'">
+              {{ formatValue(record, column) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <ng-template #emptyState>
+        <div class="preview-empty">No records are available for this upload.</div>
+      </ng-template>
+    </div>
+
+    <div class="preview-footer">
+      <button type="button" class="preview-action" (click)="dismiss.emit()">Close</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,14 @@
+<div class="confirm-overlay" *ngIf="visible">
+  <div class="confirm-shell" (click)="$event.stopPropagation()">
+    <div class="confirm-header">
+      <h3 class="confirm-title">{{ title }}</h3>
+    </div>
+    <div class="confirm-body">
+      {{ message }}
+    </div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-cancel" (click)="cancel.emit()">{{ cancelLabel }}</button>
+      <button type="button" class="confirm-approve" (click)="confirm.emit()">{{ confirmLabel }}</button>
+    </div>
+  </div>
+</div>

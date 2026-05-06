@@ -38,6 +38,37 @@
       </div>
     </div>
 
+    <!-- ── Historical Files ── -->
+    <div class="table-card history-card" style="margin-bottom: 2rem;">
+      <div class="form-header-actions" (click)="toggleHistory()" style="cursor: pointer;">
+        <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+          Historical Files
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" [style.transform]="isHistoryCollapsed ? 'rotate(-90deg)' : 'none'" style="transition: transform 0.2s;">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </h3>
+      </div>
+      <div class="history-content" *ngIf="!isHistoryCollapsed">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>File Name</th>
+              <th>Date Uploaded</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let history of historicalFiles" class="clickable-row">
+              <td>{{ history.fileName }}</td>
+              <td>{{ history.uploadDate | date:'short' }}</td>
+            </tr>
+            <tr *ngIf="historicalFiles.length === 0">
+              <td colspan="2" class="empty-state">No historical CSV files available.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- ── Records Table ── -->
     <div class="table-card">
       <div class="form-header-actions">
@@ -383,5 +414,47 @@
     </form>
   </div>
 </div>
+<!-- File Data Modal -->
+<div class="modal-overlay" *ngIf="showFileDataModal">
+  <div class="modal-container" style="max-width: 900px; width: 90vw;" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>File Data: {{ selectedFileData?.fileName }}</h2>
+      <button type="button" class="btn-close" (click)="closeFileDataModal()" title="Close">&times;</button>
+    </div>
+    
+    <div class="results-summary" style="padding: 1rem 1.5rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between;">
+      <span><strong>Uploaded:</strong> {{ selectedFileData?.uploadDate | date:'short' }}</span>
+      <span><strong>Total Records:</strong> {{ selectedFileDataRecords.length }}</span>
+    </div>
+
+    <div class="modal-body" style="padding: 0; max-height: 60vh; overflow-y: auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Check Serial #</th>
+            <th>Account Number</th>
+            <th>Beneficiary</th>
+            <th class="text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of selectedFileDataRecords">
+            <td>{{ r.date }}</td>
+            <td>{{ r.serialNumber }}</td>
+            <td>{{ r.accountNumber }}</td>
+            <td>{{ r.beneficiaryName }}</td>
+            <td class="text-right">{{ formatAmount(r.amount, r.currencyCode) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-secondary" (click)="closeFileDataModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Error Modal -->
 <app-error-modal [visible]="showErrorModal" [message]="errorMessage" (dismiss)="closeErrorModal()"></app-error-modal>

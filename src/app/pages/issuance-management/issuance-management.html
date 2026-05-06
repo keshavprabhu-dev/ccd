@@ -9,6 +9,9 @@
   <div class="full-width-panel">
     <div class="file-upload-card">
       <h3>File Upload</h3>
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
+        <button type="button" class="btn-outline-small" (click)="downloadCsvTemplate()">Download CSV Template</button>
+      </div>
       <div class="file-upload-area">
         <input type="file" id="fileUpload" class="file-input" (change)="onFileSelected($event)">
         <label for="fileUpload" class="file-label">
@@ -49,6 +52,7 @@
 
       <div class="column-config-panel" *ngIf="showColumnConfig">
         <label><input type="checkbox" [(ngModel)]="columns.beneficiaryAddress"> Beneficiary Address</label>
+        <label><input type="checkbox" [(ngModel)]="columns.sourceType"> Source</label>
         <label><input type="checkbox" [(ngModel)]="columns.createdBy"> Created By</label>
         <label><input type="checkbox" [(ngModel)]="columns.createdTimestamp"> Created Date</label>
         <label><input type="checkbox" [(ngModel)]="columns.modifiedBy"> Modified By</label>
@@ -58,7 +62,7 @@
         <label><input type="checkbox" [(ngModel)]="columns.modifiedCount"> Mod. Count</label>
       </div>
       
-      <div class="table-responsive">
+      <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
         <table class="data-table">
           <thead>
             <tr>
@@ -92,6 +96,14 @@
               <th *ngIf="columns.currencyCode" (click)="toggleSort('currencyCode')" class="sortable-header">
                 <div class="th-content">Currency <span class="sort-icon" *ngIf="sortColumn === 'currencyCode'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
                 <input *ngIf="showFilters" type="text" [(ngModel)]="filters.currencyCode" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input" placeholder="Search Currency">
+              </th>
+              <th *ngIf="columns.sourceType" (click)="toggleSort('sourceType')" class="sortable-header">
+                <div class="th-content">Source <span class="sort-icon" *ngIf="sortColumn === 'sourceType'">{{ sortDirection === 'asc' ? 'â†‘' : 'â†“' }}</span></div>
+                <select *ngIf="showFilters" [(ngModel)]="filters.sourceType" (ngModelChange)="applyFilters()" (click)="$event.stopPropagation()" class="filter-input">
+                  <option value="">All</option>
+                  <option value="MANUAL">Manual</option>
+                  <option value="CSV_UPLOAD">CSV Upload</option>
+                </select>
               </th>
               <th *ngIf="columns.createdBy" (click)="toggleSort('createdBy')" class="sortable-header">
                 <div class="th-content">Created By <span class="sort-icon" *ngIf="sortColumn === 'createdBy'">{{ sortDirection === 'asc' ? '↑' : '↓' }}</span></div>
@@ -142,6 +154,7 @@
               <td *ngIf="columns.beneficiaryAddress">{{ record.beneficiaryAddressLine1 }}</td>
               <td *ngIf="columns.amount">{{ record.amount | number:'1.2-2' }}</td>
               <td *ngIf="columns.currencyCode">{{ record.currencyCode }}</td>
+              <td *ngIf="columns.sourceType">{{ getSourceTypeLabel(record.sourceType) }}</td>
               <td *ngIf="columns.createdBy">{{ record.createdBy }}</td>
               <td *ngIf="columns.createdTimestamp">{{ record.createdTimestamp | date:'short' }}</td>
               <td *ngIf="columns.modifiedBy">{{ record.modifiedBy }}</td>
@@ -156,7 +169,7 @@
                 </app-status-badge>
               </td>
             </tr>
-            <tr *ngIf="paginatedRecords.length === 0">
+            <tr *ngIf="filteredRecords.length === 0">
               <td colspan="14" class="empty-state">No records found.</td>
             </tr>
           </tbody>
@@ -167,22 +180,6 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
         Action Required: You have {{ newCount }} new record(s) pending initial decision processing. These must be acted upon to maintain system compliance.
       </div>
-
-      <div class="table-footer-actions" *ngIf="allRecords.length > 0" style="margin-top: 1.5rem; display: flex; gap: 0.75rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
-        <select [(ngModel)]="selectedBulkAction" [ngModelOptions]="{standalone: true}" class="form-control" style="width: auto; min-width: 180px;">
-          <option value="" disabled selected>Select bulk decision...</option>
-          <option value="SUBMIT">Submit Selected</option>
-          <option *ngIf="hasPendingRecords" value="APPROVE">Approve Selected</option>
-        </select>
-        <button type="button" class="btn-primary" [disabled]="!canExecuteBulkDecision" (click)="executeBulkDecision()" style="padding: 0.75rem 1.5rem; width: auto; margin-top: 0;">Apply Decision</button>
-      </div>
-      
-      <app-pagination
-        [currentPage]="currentPage"
-        [totalPages]="totalPages"
-        (prev)="prevPage()"
-        (next)="nextPage()">
-      </app-pagination>
     </div>
   </div>
 </div>
@@ -203,7 +200,7 @@
           <th>Date Uploaded</th>
           <th>File Status</th>
           <th>Summary</th>
-          <th>Action</th>
+          <th style="width: 72px; text-align: center;">Action</th>
         </tr>
       </thead>
       <tbody>
@@ -212,9 +209,17 @@
           <td>{{ history.uploadDate | date:'short' }}</td>
           <td><span class="status-badge" [ngClass]="getStatusClass(getDynamicFileStatus(history))">{{ getDynamicFileStatus(history) }}</span></td>
           <td class="summary-cell" style="font-size: 0.85rem; color: #475569;">{{ getHistorySummary(history) }}</td>
-          <td style="display: flex; gap: 0.5rem; align-items: center; justify-content: flex-start;">
-            <button class="btn-outline-small" (click)="loadHistoricalFile(history); $event.stopPropagation()">View Data</button>
-            <button class="btn-outline-small" style="color: #ef4444; border-color: #fca5a5; background: #fef2f2;" [disabled]="!canDeleteHistoricalFile(history)" [style.opacity]="!canDeleteHistoricalFile(history) ? '0.5' : '1'" (click)="deleteHistoricalFile(history); $event.stopPropagation()">Delete File</button>
+          <td style="text-align: center;">
+            <button
+              type="button"
+              class="btn-icon btn-icon-danger"
+              title="Delete uploaded file"
+              aria-label="Delete uploaded file"
+              (click)="requestDeleteHistoricalFile(history); $event.stopPropagation()">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </button>
           </td>
         </tr>
         <tr *ngIf="historicalFiles.length === 0">
@@ -432,5 +437,27 @@
     </div>
   </div>
 </div>
+<app-file-preview-modal
+  [visible]="showFileDataModal"
+  [title]="selectedFileData?.fileName || 'Uploaded Issuance File'"
+  [subtitle]="filePreviewSubtitle"
+  [uploadedLabel]="filePreviewUploadedLabel"
+  [recordCount]="selectedFileDataRecords.length"
+  [statusLabel]="selectedFileData ? getDynamicFileStatus(selectedFileData) : ''"
+  [records]="selectedFileDataRecords"
+  [columns]="filePreviewColumns"
+  (dismiss)="closeFileDataModal()">
+</app-file-preview-modal>
+
+<app-confirm-modal
+  [visible]="!!pendingDeleteHistory"
+  title="Delete Uploaded File"
+  [message]="deleteHistoryConfirmMessage"
+  confirmLabel="Yes"
+  cancelLabel="No"
+  (confirm)="confirmDeleteHistoricalFile()"
+  (cancel)="cancelDeleteHistoricalFile()">
+</app-confirm-modal>
+
 <!-- Error Modal -->
 <app-error-modal [visible]="showErrorModal" [message]="errorMessage" (dismiss)="closeErrorModal()"></app-error-modal>

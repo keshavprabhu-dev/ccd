@@ -19,8 +19,8 @@ function Kill-PortProcess {
     $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
     if ($connections) {
         Write-Color "[*] Found running process on port $Port. Terminating..." -Color "Yellow"
-        foreach ($conn in $connections) {
-            $pid_to_kill = $conn.OwningProcess
+        $unique_pids = $connections | Select-Object -ExpandProperty OwningProcess | Select-Object -Unique
+        foreach ($pid_to_kill in $unique_pids) {
             if ($pid_to_kill -ne 0 -and $pid_to_kill -ne $PID) {
                 try {
                     Stop-Process -Id $pid_to_kill -Force -ErrorAction SilentlyContinue
